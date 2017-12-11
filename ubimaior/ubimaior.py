@@ -48,7 +48,6 @@ class MergedMapping(MutableMapping):
         self.mappings = collections.OrderedDict(mappings)
 
     def __getitem__(self, item):
-        # TODO: currently doesn't handle containers
 
         # If the key is not there, mimic built-in dict
         if not any(item in x for x in self.mappings.values()):
@@ -61,16 +60,23 @@ class MergedMapping(MutableMapping):
         }
 
         if len(set(types_for_mapping.values())) > 1:
-            # FIXME: Should we add additional checks to see if multiple types
-            # FIXME: are anyhow all Sequence or Mapping?
             msg = 'type mismatch for key "{0}".'
             msg += ' Overridden keys need to be of the same type.'
             raise TypeError(msg.format(item))
 
-        for k, v in self.mappings.items():
-            # Non-container items
-            if item in v:
-                return self.mappings[k][item]
+        values = [
+            v[item] for v in self.mappings.values() if item in v
+        ]
+
+        if isinstance(values[0], MutableMapping):
+            return MergedMapping([
+                (k, v[item]) for k, v in self.mappings.items() if item in v
+            ])
+
+        if isinstance(values[0], MutableSequence):
+            return MergedSequence(values)
+
+        return values[0]
 
     def __setitem__(self, key, value):
         pass
@@ -79,10 +85,28 @@ class MergedMapping(MutableMapping):
         pass
 
     def __iter__(self):
-        pass
+        return iter(self._get_merged_keys())
 
     def __len__(self):
-        pass
+        return len(self._get_merged_keys())
+
+    def _get_merged_keys(self):
+        """Returns the list of merged keys, ensuring a partial ordering
+        (all the keys of the first item come before the second, etc.)
+
+        Returns:
+            list of keys
+        """
+        seen_keys = set()
+
+        def seen(k):
+            res = k in seen_keys
+            seen_keys.add(k)
+            return res
+
+        return [
+            k for d in self.mappings.values() for k in d.keys() if not seen(k)
+        ]
 
 
 class MergedSequence(MutableSequence):
@@ -177,6 +201,20 @@ class MergedSequence(MutableSequence):
                 self.sequences[-1].append(value)
             else:
                 self.sequences[0].insert(0, value)
+
+    def __eq__(self, other):
+        # Following what built-in lists do, compare False to
+        # other types.
+        if isinstance(other, MergedSequence):
+            if len(self) != len(other):
+                return False
+
+            for x, y in zip(self.sequences, other.sequences):
+                if x != y:
+                    return False
+                return True
+
+        return NotImplemented
 
     def _raise_if_not_slice_or_integer(self, item):
         """Raise a TypeError if the argument is not a slice or an integer.

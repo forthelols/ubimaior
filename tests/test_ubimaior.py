@@ -22,9 +22,6 @@ def sequence():
 
 class TestMergedMapping(object):
     def test_errors_on_init(self):
-        """Tests that errors occurring when constructing an
-        instance are handled in a proper way
-        """
 
         # not a list
         with pytest.raises(TypeError) as excinfo:
@@ -37,9 +34,6 @@ class TestMergedMapping(object):
         assert 'items in "mappings" should be' in str(excinfo.value)
 
     def test_reading_non_container_types(self):
-        """Tests that reading non-container types from a MergedMapping
-        behaves as designed.
-        """
 
         highest_priority = {
             'foo': 1
@@ -68,6 +62,72 @@ class TestMergedMapping(object):
         with pytest.raises(KeyError):
             merged['this_key_does_not_exit']
 
+    def test_reading_lists(self):
+        highest_priority = {
+            'foo': [1],
+            'baz': [1, 2, 3],
+            'foobar': []
+        }
+
+        middle_priority = {
+            'foo': [11],  # type(foo) is always an int
+            'bar': ['a']
+        }
+
+        lowest_priority = {
+            'foo': [111],
+            'bar': ['b'],  # type(bar) is always a string
+            'baz': [4, 5, 6]
+        }
+
+        merged = ubimaior.MergedMapping([
+            ('highest', highest_priority),
+            ('middle', middle_priority),
+            ('lowest', lowest_priority)
+        ])
+
+        assert merged['foo'][:] == [1, 11, 111]
+        assert merged['baz'][:] == [1, 2, 3, 4, 5, 6]
+        assert merged['foobar'][:] == []
+        assert merged['bar'][:] == ['a', 'b']
+
+    def test_reading_dicts(self):
+        highest_priority = {
+            'foo': {'a': 1},
+            'baz': {'a': [1, 2, 3]},
+        }
+
+        middle_priority = {
+            'foo': {'a': 11, 'b': 22},
+            'bar': {'a': 'one'}
+        }
+
+        lowest_priority = {
+            'foo': {'c': 111},
+            'bar': {'b': 'two'},
+            'baz': {'a': [4, 5, 6]}
+        }
+
+        merged = ubimaior.MergedMapping([
+            ('highest', highest_priority),
+            ('middle', middle_priority),
+            ('lowest', lowest_priority)
+        ])
+
+        assert len(merged) == 3
+
+        assert merged['foo']['a'] == 1
+        assert merged['foo']['b'] == 22
+        assert merged['foo']['c'] == 111
+        assert len(merged['foo']) == 3
+
+        assert merged['baz']['a'][:] == [1, 2, 3, 4, 5, 6]
+        assert len(merged['baz']) == 1
+
+        assert merged['bar']['a'] == 'one'
+        assert merged['bar']['b'] == 'two'
+        assert len(merged['bar']) == 2
+
     def test_errors_when_reading(self):
         """Tests all the errors that may happen when reading from a mapping."""
         # Type mismatch on a key
@@ -81,12 +141,37 @@ class TestMergedMapping(object):
             merged['foo']
         assert 'type mismatch for key' in str(excinfo.value)
 
+    def test_iteration(self):
+
+        highest_priority = {
+            'foo': 1
+        }
+
+        middle_priority = {
+            'foo': 6,  # type(foo) is always an int
+            'bar': 'this_is_bar'
+        }
+
+        lowest_priority = {
+            'bar': '4',  # type(bar) is always a string
+            'baz': False
+        }
+
+        merged = ubimaior.MergedMapping([
+            ('highest', highest_priority),
+            ('middle', middle_priority),
+            ('lowest', lowest_priority)
+        ])
+
+        for key, expected in zip(merged, ['foo', 'bar', 'baz']):
+            assert key == expected
+
+        assert list(merged.keys()) == ['foo', 'bar', 'baz']
+
 
 class TestMergedSequence(object):
     def test_errors_on_init(self):
-        """Tests that errors occurring when constructing an
-        instance are handled in a proper way
-        """
+
         # not a list
         with pytest.raises(TypeError) as excinfo:
             ubimaior.MergedSequence('not_the_correct_type')
@@ -98,9 +183,6 @@ class TestMergedSequence(object):
         assert 'items in "sequences" should be' in str(excinfo.value)
 
     def test_getting_items(self, sequence):
-        """Tests that retrieving elements from the merged list
-        works as expected.
-        """
 
         # Length is the sum of the lengths of items
         assert len(sequence) == 12
@@ -124,10 +206,6 @@ class TestMergedSequence(object):
         assert 'list indices must be integers or slices' in str(excinfo.value)
 
     def test_modifying_mutable_items(self):
-        """Tests the that the modification semantic is the same as
-        built-in lists.
-        """
-
         lists = [[1, 2, 3], ['a', 'b', 'c']]
         dicts = [{1: 'foo'}]
 
@@ -319,3 +397,33 @@ class TestMergedSequence(object):
             sequence.insert('a', 101)
         msg = str(excinfo.value)
         assert '\'str\' object cannot be interpreted as an integer' == msg
+
+    def test_equality(self, sequence):
+
+        normal_list = sequence[:]
+
+        another_sequence = ubimaior.MergedSequence([
+            [1, 2, 3],
+            ['a', 'b', 'c'],
+            [False, True, None],
+            [1, 'a', False]
+        ])
+
+        # Equality constructing a list
+        assert list(sequence) == normal_list
+
+        # Equality with the same type
+        assert sequence == another_sequence
+        assert another_sequence == sequence
+
+        not_really_equal = ubimaior.MergedSequence([
+            [1, 2],
+            [3, 'a', 'b', 'c'],
+            [False],
+            [True, None, 1, 'a', False]
+        ])
+
+        # Test that distribution of values in items
+        # enters comparison for MergedSequence objects
+        assert list(not_really_equal) == sequence[:]
+        assert not_really_equal != sequence

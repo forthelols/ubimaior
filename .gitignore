@@ -4,3 +4,4 @@
 .tox
 .idea
 ubimaior.egg-info
+docs/_build

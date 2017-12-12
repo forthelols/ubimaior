@@ -20,6 +20,90 @@ def sequence():
     ])
 
 
+@pytest.fixture()
+def mapping_nc():
+    """An instance of a merged mapping, with non-container values."""
+    highest_priority = {
+        'foo': 1
+    }
+
+    middle_priority = {
+        'foo': 6,  # type(foo) is always an int
+        'bar': 'this_is_bar'
+    }
+
+    lowest_priority = {
+        'bar': '4',  # type(bar) is always a string
+        'baz': False
+    }
+
+    merged = ubimaior.MergedMapping([
+        ('highest', highest_priority),
+        ('middle', middle_priority),
+        ('lowest', lowest_priority)
+    ])
+
+    return merged
+
+
+@pytest.fixture()
+def mapping_l():
+    """An instance of a merged mapping, with list values."""
+    highest_priority = {
+        'foo': [1],
+        'baz': [1, 2, 3],
+        'foobar': []
+    }
+
+    middle_priority = {
+        'foo': [11],  # type(foo) is always an int
+        'bar': ['a']
+    }
+
+    lowest_priority = {
+        'foo': [111],
+        'bar': ['b'],  # type(bar) is always a string
+        'baz': [4, 5, 6]
+    }
+
+    merged = ubimaior.MergedMapping([
+        ('highest', highest_priority),
+        ('middle', middle_priority),
+        ('lowest', lowest_priority)
+    ])
+
+    return merged
+
+
+@pytest.fixture()
+def mapping_d():
+    """An instance of a merged mapping, with dict values."""
+
+    highest_priority = {
+        'foo': {'a': 1},
+        'baz': {'a': [1, 2, 3]},
+    }
+
+    middle_priority = {
+        'foo': {'a': 11, 'b': 22},
+        'bar': {'a': 'one'}
+    }
+
+    lowest_priority = {
+        'foo': {'c': 111},
+        'bar': {'b': 'two'},
+        'baz': {'a': [4, 5, 6]}
+    }
+
+    merged = ubimaior.MergedMapping([
+        ('highest', highest_priority),
+        ('middle', middle_priority),
+        ('lowest', lowest_priority)
+    ])
+
+    return merged
+
+
 class TestMergedMapping(object):
     def test_errors_on_init(self):
 
@@ -33,100 +117,36 @@ class TestMergedMapping(object):
             ubimaior.MergedMapping([1, 2, 3])
         assert 'items in "mappings" should be' in str(excinfo.value)
 
-    def test_reading_non_container_types(self):
+    def test_reading_non_container_types(self, mapping_nc):
 
-        highest_priority = {
-            'foo': 1
-        }
-
-        middle_priority = {
-            'foo': 6,  # type(foo) is always an int
-            'bar': 'this_is_bar'
-        }
-
-        lowest_priority = {
-            'bar': '4',  # type(bar) is always a string
-            'baz': False
-        }
-
-        merged = ubimaior.MergedMapping([
-            ('highest', highest_priority),
-            ('middle', middle_priority),
-            ('lowest', lowest_priority)
-        ])
-
-        assert merged['foo'] == 1
-        assert merged['bar'] == 'this_is_bar'
-        assert merged['baz'] is False
+        assert mapping_nc['foo'] == 1
+        assert mapping_nc['bar'] == 'this_is_bar'
+        assert mapping_nc['baz'] is False
 
         with pytest.raises(KeyError):
-            merged['this_key_does_not_exit']
+            mapping_nc['this_key_does_not_exit']
 
-    def test_reading_lists(self):
-        highest_priority = {
-            'foo': [1],
-            'baz': [1, 2, 3],
-            'foobar': []
-        }
+    def test_reading_lists(self, mapping_l):
+        assert mapping_l['foo'][:] == [1, 11, 111]
+        assert mapping_l['baz'][:] == [1, 2, 3, 4, 5, 6]
+        assert mapping_l['foobar'][:] == []
+        assert mapping_l['bar'][:] == ['a', 'b']
 
-        middle_priority = {
-            'foo': [11],  # type(foo) is always an int
-            'bar': ['a']
-        }
+    def test_reading_dicts(self, mapping_d):
 
-        lowest_priority = {
-            'foo': [111],
-            'bar': ['b'],  # type(bar) is always a string
-            'baz': [4, 5, 6]
-        }
+        assert len(mapping_d) == 3
 
-        merged = ubimaior.MergedMapping([
-            ('highest', highest_priority),
-            ('middle', middle_priority),
-            ('lowest', lowest_priority)
-        ])
+        assert mapping_d['foo']['a'] == 1
+        assert mapping_d['foo']['b'] == 22
+        assert mapping_d['foo']['c'] == 111
+        assert len(mapping_d['foo']) == 3
 
-        assert merged['foo'][:] == [1, 11, 111]
-        assert merged['baz'][:] == [1, 2, 3, 4, 5, 6]
-        assert merged['foobar'][:] == []
-        assert merged['bar'][:] == ['a', 'b']
+        assert mapping_d['baz']['a'][:] == [1, 2, 3, 4, 5, 6]
+        assert len(mapping_d['baz']) == 1
 
-    def test_reading_dicts(self):
-        highest_priority = {
-            'foo': {'a': 1},
-            'baz': {'a': [1, 2, 3]},
-        }
-
-        middle_priority = {
-            'foo': {'a': 11, 'b': 22},
-            'bar': {'a': 'one'}
-        }
-
-        lowest_priority = {
-            'foo': {'c': 111},
-            'bar': {'b': 'two'},
-            'baz': {'a': [4, 5, 6]}
-        }
-
-        merged = ubimaior.MergedMapping([
-            ('highest', highest_priority),
-            ('middle', middle_priority),
-            ('lowest', lowest_priority)
-        ])
-
-        assert len(merged) == 3
-
-        assert merged['foo']['a'] == 1
-        assert merged['foo']['b'] == 22
-        assert merged['foo']['c'] == 111
-        assert len(merged['foo']) == 3
-
-        assert merged['baz']['a'][:] == [1, 2, 3, 4, 5, 6]
-        assert len(merged['baz']) == 1
-
-        assert merged['bar']['a'] == 'one'
-        assert merged['bar']['b'] == 'two'
-        assert len(merged['bar']) == 2
+        assert mapping_d['bar']['a'] == 'one'
+        assert mapping_d['bar']['b'] == 'two'
+        assert len(mapping_d['bar']) == 2
 
     def test_errors_when_reading(self):
         """Tests all the errors that may happen when reading from a mapping."""
@@ -141,32 +161,67 @@ class TestMergedMapping(object):
             merged['foo']
         assert 'type mismatch for key' in str(excinfo.value)
 
-    def test_iteration(self):
+    def test_setting_preferred_scope(self):
+        pass
 
-        highest_priority = {
-            'foo': 1
-        }
+    def test_setting_non_container_types(self, mapping_nc):
 
-        middle_priority = {
-            'foo': 6,  # type(foo) is always an int
-            'bar': 'this_is_bar'
-        }
+        mapping_nc.preferred_scope = 'middle'
 
-        lowest_priority = {
-            'bar': '4',  # type(bar) is always a string
-            'baz': False
-        }
+        mapping_nc['foo'] = 11
+        assert mapping_nc['foo'] == 11
+        assert mapping_nc.mappings['highest']['foo'] == 11
+        assert mapping_nc.mappings['middle']['foo'] == 6
 
-        merged = ubimaior.MergedMapping([
-            ('highest', highest_priority),
-            ('middle', middle_priority),
-            ('lowest', lowest_priority)
-        ])
+        mapping_nc['bar'] = 'overwritten'
+        assert mapping_nc['bar'] == 'overwritten'
+        assert 'bar' not in mapping_nc.mappings['highest']
+        assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
+        assert mapping_nc.mappings['lowest']['bar'] == '4'
 
-        for key, expected in zip(merged, ['foo', 'bar', 'baz']):
+        assert 'baz' not in mapping_nc.mappings['middle']
+        mapping_nc['baz'] = True
+        assert mapping_nc['baz'] is True
+        assert 'baz' not in mapping_nc.mappings['highest']
+        assert mapping_nc.mappings['middle']['baz'] is True
+        assert mapping_nc.mappings['lowest']['baz'] is False
+
+        with pytest.raises(TypeError) as excinfo:
+            mapping_nc['foo'] = 'a_string'
+        assert 'cannot assign value of type' in str(excinfo.value)
+
+    def test_setting_containers(self, mapping_l):
+
+        mapping_l['foo'] = [1, 2, 3]
+        assert list(mapping_l['foo']) == [1, 2, 3]
+        assert mapping_l.mappings['highest']['foo'] == [1, 2, 3]
+        assert 'foo' not in mapping_l.mappings['middle']
+        assert 'foo' not in mapping_l.mappings['lowest']
+
+        mapping_l.preferred_scope = 'middle'
+        mapping_l['baz'] = [1, 2, 3]
+        assert list(mapping_l['baz']) == [1, 2, 3]
+        assert 'baz' not in mapping_l.mappings['highest']
+        assert mapping_l.mappings['middle']['baz'] == [1, 2, 3]
+        assert 'baz' not in mapping_l.mappings['lowest']
+
+    def test_deleting_types(self, mapping_nc):
+
+        mapping_nc.preferred_scope = 'middle'
+
+        for key in ('foo', 'bar', 'baz'):
+            assert key in mapping_nc
+            del mapping_nc[key]
+            assert key not in mapping_nc
+            for v in mapping_nc.mappings.values():
+                assert key not in v
+
+    def test_iteration(self, mapping_nc):
+
+        for key, expected in zip(mapping_nc, ['foo', 'bar', 'baz']):
             assert key == expected
 
-        assert list(merged.keys()) == ['foo', 'bar', 'baz']
+        assert list(mapping_nc.keys()) == ['foo', 'bar', 'baz']
 
 
 class TestMergedSequence(object):

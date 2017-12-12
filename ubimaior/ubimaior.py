@@ -30,7 +30,11 @@ class MergedMapping(MutableMapping):
 
     FIXME: Is this implementable in terms of collections.ChainMap?
     """
-    def __init__(self, mappings):
+
+    #: Caches the setting of the preferred scope
+    _preferred_scope = None
+
+    def __init__(self, mappings, preferred_scope=None):
         # Check the type of mappings, which should be a list of
         # (str, Mapping) tuples
         if not isinstance(mappings, list):
@@ -46,31 +50,23 @@ class MergedMapping(MutableMapping):
         #: Ordered dict that contains the priority list
         #: of mappings
         self.mappings = collections.OrderedDict(mappings)
+        self.preferred_scope = preferred_scope
 
-    def __getitem__(self, item):
+    def __getitem__(self, key):
 
         # If the key is not there, mimic built-in dict
-        if not any(item in x for x in self.mappings.values()):
-            raise KeyError(item)
+        if not any(key in x for x in self.mappings.values()):
+            raise KeyError(key)
 
-        # If the key is present in multiple mappings, and holds
-        # instances of different types raise a TypeError
-        types_for_mapping = {
-            k: type(v[item]) for k, v in self.mappings.items() if item in v
-        }
-
-        if len(set(types_for_mapping.values())) > 1:
-            msg = 'type mismatch for key "{0}".'
-            msg += ' Overridden keys need to be of the same type.'
-            raise TypeError(msg.format(item))
+        self._type_for_key_or_raise(key)
 
         values = [
-            v[item] for v in self.mappings.values() if item in v
+            v[key] for v in self.mappings.values() if key in v
         ]
 
         if isinstance(values[0], MutableMapping):
             return MergedMapping([
-                (k, v[item]) for k, v in self.mappings.items() if item in v
+                (k, v[key]) for k, v in self.mappings.items() if key in v
             ])
 
         if isinstance(values[0], MutableSequence):
@@ -79,10 +75,36 @@ class MergedMapping(MutableMapping):
         return values[0]
 
     def __setitem__(self, key, value):
-        pass
+        # TODO: add an option to be strict on the scope, and fail
+        # TODO: with an error? This will be useful if we want to write
+        # TODO: only in a single scope.
+
+        # Check that the type of value is compatible with
+        current_type = self._type_for_key_or_raise(key)
+        if current_type != type(value) and current_type is not None:
+            try:
+                value = current_type(value)
+            except Exception:
+                msg = 'cannot assign value of type {0} to key "{1}"'
+                msg += '[{0} is not convertible to {2}]'
+                raise TypeError(msg.format(
+                    type(value).__name__, key, current_type.__name__
+                ))
+
+        # If I want to set a list or dictionary to be exactly
+        # what is passed in, then I need to delete what's already
+        # there first.
+        if isinstance(value, (MutableSequence, MutableMapping)):
+            del self[key]
+
+        scope = self._get_writing_scope(key)
+        self.mappings[scope][key] = value
 
     def __delitem__(self, key):
-        pass
+        # Deleting a type means deleting it from every managed scope
+        for scope, d in self.mappings.items():
+            if key in d:
+                del d[key]
 
     def __iter__(self):
         return iter(self._get_merged_keys())
@@ -107,6 +129,63 @@ class MergedMapping(MutableMapping):
         return [
             k for d in self.mappings.values() for k in d.keys() if not seen(k)
         ]
+
+    def _get_writing_scope(self, key):
+        for scope, item in self.mappings.items():
+            # The current scope is the writing scope if either:
+            # 1. There's no preferred scope (always returns the first scope)
+            # 2. The preferred scope IS the current one
+            # 3. The key I want to write appears in this scope (which means
+            # the preferred scope is lower priority than this)
+            if self.preferred_scope is None or \
+                    self.preferred_scope == scope or \
+                    key in item:
+                return scope
+
+    def _type_for_key_or_raise(self, key):
+        """Returns the type associated with a given key.
+
+        Args:
+            key: key to be searched
+
+        Returns:
+            type of the value (must be consistent among all
+            the managed mappings) or None if ``key not in self``
+
+        Raises:
+            TypeError: if more than one type is associated with the key
+        """
+        # If the key is present in multiple mappings, and holds
+        # instances of different types raise a TypeError
+        types_for_mapping = {
+            scope: type(v[key])
+            for scope, v in self.mappings.items() if key in v
+        }
+        if len(set(types_for_mapping.values())) > 1:
+            msg = 'type mismatch for key "{0}".'
+            msg += ' Overridden keys need to be of the same type.'
+            raise TypeError(msg.format(key))
+
+        if types_for_mapping:
+            return next(iter(types_for_mapping.values()))
+
+        return None
+
+    @property
+    def preferred_scope(self):
+        """Preferred scope for writing."""
+        return self._preferred_scope
+
+    @preferred_scope.setter
+    def preferred_scope(self, value):
+        if value not in itertools.chain(self.mappings.keys(), [None]):
+            msg = '{0} is an invalid value for preferred scope. '
+            msg += 'Allowed values are {1}'
+            raise ValueError(
+                msg.format(str(value), str(self.mappings.keys()))
+            )
+
+        self._preferred_scope = value
 
 
 class MergedSequence(MutableSequence):

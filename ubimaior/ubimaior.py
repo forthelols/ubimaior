@@ -47,6 +47,11 @@ class MergedMapping(MutableMapping):
                   ' tuples of length 2'
             raise TypeError(msg)
 
+        # Check that the items in the list have the correct type
+        if len(mappings) == 0:
+            msg = '"mappings" should contain one or more items (zero found)'
+            raise ValueError(msg)
+
         #: Ordered dict that contains the priority list
         #: of mappings
         self.mappings = collections.OrderedDict(mappings)
@@ -391,3 +396,44 @@ class MergedSequence(MutableSequence):
                 ).extend(value)
 
         return values
+
+
+class OverridableMapping(MergedMapping):
+    """A MergedMapping with some rules to override keys in the hierarchy."""
+
+    def __getitem__(self, key):
+        # Check that we don't have more than one key once we applied the
+        # overriding rules
+        scope2keys = [  # (scope, [list of matching keys])
+            (scope, [k for k in d if key == str(k).rstrip(':')])
+            for (scope, d) in self.mappings.items()
+        ]
+
+        # TODO: check for len(keys) > 1 and raise if necessary
+
+        values = []
+        for scope, keys in scope2keys:
+            # No key in this scope, continue to the next
+            if len(keys) == 0:
+                continue
+
+            # Append (scope, key) and break if this key
+            # was an overriding one
+            key = keys[0]
+            values.append((scope, self.mappings[scope][key]))
+            if key.endswith(':'):
+                break
+
+        # Mimic built-in if the key does not exist
+        if not values:
+            raise KeyError(key)
+
+        first_value = values[0][1]
+
+        if isinstance(first_value, MutableMapping):
+            return OverridableMapping(values)
+
+        if isinstance(first_value, MutableSequence):
+            return MergedSequence([value for _, value in values])
+
+        return first_value

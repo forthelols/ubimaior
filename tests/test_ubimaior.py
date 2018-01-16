@@ -20,8 +20,13 @@ def sequence():
     ])
 
 
+@pytest.fixture(params=[ubimaior.MergedMapping, ubimaior.OverridableMapping])
+def mapping_type(request):
+    return request.param
+
+
 @pytest.fixture()
-def mapping_nc():
+def mapping_nc(mapping_type):
     """An instance of a merged mapping, with non-container values."""
     highest_priority = {
         'foo': 1
@@ -37,7 +42,7 @@ def mapping_nc():
         'baz': False
     }
 
-    merged = ubimaior.MergedMapping([
+    merged = mapping_type([
         ('highest', highest_priority),
         ('middle', middle_priority),
         ('lowest', lowest_priority)
@@ -104,18 +109,51 @@ def mapping_d():
     return merged
 
 
-class TestMergedMapping(object):
-    def test_errors_on_init(self):
+@pytest.fixture()
+def overridable():
+    """An instance of a merged mapping, with list values."""
+    highest_priority = {
+        'foo': [11, 22],
+        'baz': [1, 2, 3],
+        'foobar': []
+    }
 
+    middle_priority = {
+        'foo:': ['a', 'b'],
+        'bar': ['a']
+    }
+
+    lowest_priority = {
+        'foo': [111],
+        'bar': ['b'],  # type(bar) is always a string
+        'baz': [4, 5, 6]
+    }
+
+    merged = ubimaior.OverridableMapping([
+        ('highest', highest_priority),
+        ('middle', middle_priority),
+        ('lowest', lowest_priority)
+    ])
+
+    return merged
+
+
+class TestAllMappings(object):
+    def test_errors_on_init(self, mapping_type):
         # not a list
         with pytest.raises(TypeError) as excinfo:
-            ubimaior.MergedMapping('not_the_correct_type')
+            mapping_type('not_the_correct_type')
         assert '"mappings" should be a list' in str(excinfo.value)
 
         # items are not of the correct type
         with pytest.raises(TypeError) as excinfo:
-            ubimaior.MergedMapping([1, 2, 3])
+            mapping_type([1, 2, 3])
         assert 'items in "mappings" should be' in str(excinfo.value)
+
+        # one or more mapping is needed
+        with pytest.raises(ValueError) as excinfo:
+            mapping_type([])
+        assert '"mappings" should contain one or more' in str(excinfo.value)
 
     def test_reading_non_container_types(self, mapping_nc):
 
@@ -125,6 +163,53 @@ class TestMergedMapping(object):
 
         with pytest.raises(KeyError):
             mapping_nc['this_key_does_not_exit']
+
+    def test_setting_non_container_types(self, mapping_nc):
+
+        mapping_nc.preferred_scope = 'middle'
+
+        mapping_nc['foo'] = 11
+        assert mapping_nc['foo'] == 11
+        assert mapping_nc.mappings['highest']['foo'] == 11
+        assert mapping_nc.mappings['middle']['foo'] == 6
+
+        mapping_nc['bar'] = 'overwritten'
+        assert mapping_nc['bar'] == 'overwritten'
+        assert 'bar' not in mapping_nc.mappings['highest']
+        assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
+        assert mapping_nc.mappings['lowest']['bar'] == '4'
+
+        assert 'baz' not in mapping_nc.mappings['middle']
+        mapping_nc['baz'] = True
+        assert mapping_nc['baz'] is True
+        assert 'baz' not in mapping_nc.mappings['highest']
+        assert mapping_nc.mappings['middle']['baz'] is True
+        assert mapping_nc.mappings['lowest']['baz'] is False
+
+        with pytest.raises(TypeError) as excinfo:
+            mapping_nc['foo'] = 'a_string'
+        assert 'cannot assign value of type' in str(excinfo.value)
+
+    def test_deleting_types(self, mapping_nc):
+
+        mapping_nc.preferred_scope = 'middle'
+
+        for key in ('foo', 'bar', 'baz'):
+            assert key in mapping_nc
+            del mapping_nc[key]
+            assert key not in mapping_nc
+            for v in mapping_nc.mappings.values():
+                assert key not in v
+
+    def test_iteration(self, mapping_nc):
+
+        for key, expected in zip(mapping_nc, ['foo', 'bar', 'baz']):
+            assert key == expected
+
+        assert list(mapping_nc.keys()) == ['foo', 'bar', 'baz']
+
+
+class TestMergedMapping(object):
 
     def test_reading_lists(self, mapping_l):
         assert mapping_l['foo'][:] == [1, 11, 111]
@@ -162,33 +247,8 @@ class TestMergedMapping(object):
         assert 'type mismatch for key' in str(excinfo.value)
 
     def test_setting_preferred_scope(self):
+        # TODO: write a test for this
         pass
-
-    def test_setting_non_container_types(self, mapping_nc):
-
-        mapping_nc.preferred_scope = 'middle'
-
-        mapping_nc['foo'] = 11
-        assert mapping_nc['foo'] == 11
-        assert mapping_nc.mappings['highest']['foo'] == 11
-        assert mapping_nc.mappings['middle']['foo'] == 6
-
-        mapping_nc['bar'] = 'overwritten'
-        assert mapping_nc['bar'] == 'overwritten'
-        assert 'bar' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
-        assert mapping_nc.mappings['lowest']['bar'] == '4'
-
-        assert 'baz' not in mapping_nc.mappings['middle']
-        mapping_nc['baz'] = True
-        assert mapping_nc['baz'] is True
-        assert 'baz' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['baz'] is True
-        assert mapping_nc.mappings['lowest']['baz'] is False
-
-        with pytest.raises(TypeError) as excinfo:
-            mapping_nc['foo'] = 'a_string'
-        assert 'cannot assign value of type' in str(excinfo.value)
 
     def test_setting_containers(self, mapping_l):
 
@@ -204,24 +264,6 @@ class TestMergedMapping(object):
         assert 'baz' not in mapping_l.mappings['highest']
         assert mapping_l.mappings['middle']['baz'] == [1, 2, 3]
         assert 'baz' not in mapping_l.mappings['lowest']
-
-    def test_deleting_types(self, mapping_nc):
-
-        mapping_nc.preferred_scope = 'middle'
-
-        for key in ('foo', 'bar', 'baz'):
-            assert key in mapping_nc
-            del mapping_nc[key]
-            assert key not in mapping_nc
-            for v in mapping_nc.mappings.values():
-                assert key not in v
-
-    def test_iteration(self, mapping_nc):
-
-        for key, expected in zip(mapping_nc, ['foo', 'bar', 'baz']):
-            assert key == expected
-
-        assert list(mapping_nc.keys()) == ['foo', 'bar', 'baz']
 
 
 class TestMergedSequence(object):
@@ -482,3 +524,9 @@ class TestMergedSequence(object):
         # enters comparison for MergedSequence objects
         assert list(not_really_equal) == sequence[:]
         assert not_really_equal != sequence
+
+
+class TestOverridableMapping(object):
+    def test_reading_containers(self, overridable):
+
+        assert list(overridable['foo']) == [11, 22, 'a', 'b']

@@ -24,7 +24,7 @@ def _is_tuple_str_mapping(obj):
         isinstance(obj[0], str) and isinstance(obj[1], MutableMapping)
 
 
-class MergedMapping(MutableMapping):
+class MergedMapping(MutableMapping):  # pylint: disable=too-many-ancestors
     """Shows a list of mappings with different levels of priority as
     they were a single one.
 
@@ -211,7 +211,7 @@ def _raise_if_not_slice_or_integer(item):
         raise TypeError(msg)
 
 
-class MergedSequence(MutableSequence):
+class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
     """Shows a list of sequences with different levels of priority as
     they were a single one.
 
@@ -404,7 +404,7 @@ class MergedSequence(MutableSequence):
         return values
 
 
-class OverridableMapping(MergedMapping):
+class OverridableMapping(MergedMapping):  # pylint: disable=too-many-ancestors
     """A MergedMapping with some rules to override keys in the hierarchy."""
 
     def __getitem__(self, key):

@@ -4,7 +4,11 @@ python:
 -   "3.4"
 -   "3.5"
 -   "3.6"
+
 install:
 -   pip install tox-travis
+-   pip install codecov
+
 script:
 -   tox
+-   codecov --env PYTHON_VERSION --required

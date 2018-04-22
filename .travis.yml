@@ -1,4 +1,12 @@
 language: python
+
+# Limit the branches that are tested on push
+branches:
+  only:
+    - master
+    - develop
+    - /^releases\/.*$/
+
 python:
 -   "2.7"
 -   "3.4"
@@ -11,4 +19,4 @@ install:
 
 script:
 -   tox
--   codecov --env PYTHON_VERSION --required
+-   codecov --required

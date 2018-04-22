@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
+"""Ubimaior is a package to manage hierarchical configurations"""
 
-import collections
 import itertools
 
 try:
+    import collections
     from collections.abc import MutableMapping, MutableSequence, Iterable
 except ImportError:
+    import collections
     from collections import MutableMapping, MutableSequence, Iterable
 
 
@@ -22,7 +24,7 @@ def _is_tuple_str_mapping(obj):
         isinstance(obj[0], str) and isinstance(obj[1], MutableMapping)
 
 
-class MergedMapping(MutableMapping):
+class MergedMapping(MutableMapping):  # pylint: disable=too-many-ancestors
     """Shows a list of mappings with different levels of priority as
     they were a single one.
 
@@ -48,7 +50,7 @@ class MergedMapping(MutableMapping):
             raise TypeError(msg)
 
         # Check that the items in the list have the correct type
-        if len(mappings) == 0:
+        if not mappings:
             msg = '"mappings" should contain one or more items (zero found)'
             raise ValueError(msg)
 
@@ -107,9 +109,9 @@ class MergedMapping(MutableMapping):
 
     def __delitem__(self, key):
         # Deleting a type means deleting it from every managed scope
-        for scope, d in self.mappings.items():
-            if key in d:
-                del d[key]
+        for _, mapping in self.mappings.items():
+            if key in mapping:
+                del mapping[key]
 
     def __iter__(self):
         return iter(self._get_merged_keys())
@@ -127,6 +129,7 @@ class MergedMapping(MutableMapping):
         seen_keys = set()
 
         def seen(k):
+            """Returns True if 'k' was already seen, False otherwise"""
             res = k in seen_keys
             seen_keys.add(k)
             return res
@@ -146,6 +149,7 @@ class MergedMapping(MutableMapping):
                     self.preferred_scope == scope or \
                     key in item:
                 return scope
+        return None
 
     def _type_for_key_or_raise(self, key):
         """Returns the type associated with a given key.
@@ -193,7 +197,21 @@ class MergedMapping(MutableMapping):
         self._preferred_scope = value
 
 
-class MergedSequence(MutableSequence):
+def _raise_if_not_slice_or_integer(item):
+    """Raise a TypeError if the argument is not a slice or an integer.
+
+    Args:
+        item: object to be checked
+
+    Raises:
+        TypeError: when ``not isinstance(item, (slice, int))``
+    """
+    if not isinstance(item, (slice, int)):
+        msg = 'list indices must be integers or slices, not str'
+        raise TypeError(msg)
+
+
+class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
     """Shows a list of sequences with different levels of priority as
     they were a single one.
 
@@ -213,7 +231,7 @@ class MergedSequence(MutableSequence):
         self.sequences = sequences
 
     def __getitem__(self, idx):
-        self._raise_if_not_slice_or_integer(idx)
+        _raise_if_not_slice_or_integer(idx)
 
         # Handle slices
         if isinstance(idx, slice):
@@ -230,7 +248,7 @@ class MergedSequence(MutableSequence):
         return sum([len(x) for x in self.sequences])
 
     def __setitem__(self, idx, value):
-        self._raise_if_not_slice_or_integer(idx)
+        _raise_if_not_slice_or_integer(idx)
 
         # Mimic built-in list for this case
         if isinstance(idx, slice) and not isinstance(value, Iterable):
@@ -246,8 +264,8 @@ class MergedSequence(MutableSequence):
 
             slices = self._split_slice(idx)
             values = self._split_value(value, slices)
-            for x, sl, vl in zip(self.sequences, slices, values):
-                x[sl] = vl
+            for sequence, index, val in zip(self.sequences, slices, values):
+                sequence[index] = val
             return
 
         # Handle integers
@@ -255,13 +273,13 @@ class MergedSequence(MutableSequence):
         self.sequences[item_idx][idx] = value
 
     def __delitem__(self, idx):
-        self._raise_if_not_slice_or_integer(idx)
+        _raise_if_not_slice_or_integer(idx)
 
         # Handle slices
         if isinstance(idx, slice):
             slices = self._split_slice(idx)
-            for x, sl in zip(self.sequences, slices):
-                del x[sl]
+            for sequence, index in zip(self.sequences, slices):
+                del sequence[index]
             return
 
         # Handle integers
@@ -293,25 +311,12 @@ class MergedSequence(MutableSequence):
             if len(self) != len(other):
                 return False
 
-            for x, y in zip(self.sequences, other.sequences):
-                if x != y:
+            for rsequence, lsequence in zip(self.sequences, other.sequences):
+                if rsequence != lsequence:
                     return False
                 return True
 
         return NotImplemented
-
-    def _raise_if_not_slice_or_integer(self, item):
-        """Raise a TypeError if the argument is not a slice or an integer.
-
-        Args:
-            item: object to be checked
-
-        Raises:
-            TypeError: when ``not isinstance(item, (slice, int))``
-        """
-        if not isinstance(item, (slice, int)):
-            msg = 'list indices must be integers or slices, not str'
-            raise TypeError(msg)
 
     def _return_item_and_index(self, idx):
         """Given an index that refers to the merged list, return the index of
@@ -329,10 +334,10 @@ class MergedSequence(MutableSequence):
         """
         idx = len(self) + idx if idx < 0 else idx
 
-        for ii, x in enumerate(self.sequences):
-            if idx < len(x):
-                return ii, idx
-            idx -= len(x)
+        for counter, sequence in enumerate(self.sequences):
+            if idx < len(sequence):
+                return counter, idx
+            idx -= len(sequence)
 
         raise IndexError('list index out of range')
 
@@ -351,15 +356,16 @@ class MergedSequence(MutableSequence):
         # Normalize to this length
         idx = slice(*idx.indices(len(self)))
 
-        for x in self.sequences:
-            def next_slice(sl):
-                start = max(sl.start - len(x), 0)
-                stop = max(sl.stop - len(x), 0)
-                return slice(start, stop, sl.step)
+        for sequence in self.sequences:
+            def next_slice(slc, seq):
+                """Gives the next slice of a merged sequence"""
+                start = max(slc.start - len(seq), 0)
+                stop = max(slc.stop - len(seq), 0)
+                return slice(start, stop, slc.step)
 
-            local_indices = idx.indices(len(x))
+            local_indices = idx.indices(len(sequence))
             slices.append(slice(*local_indices))
-            idx = next_slice(idx)
+            idx = next_slice(idx, sequence)
 
         return slices
 
@@ -377,14 +383,14 @@ class MergedSequence(MutableSequence):
         """
         values = []
 
-        for sl in slices:
-            length = len(range(sl.start, sl.stop, sl.step))
+        for slc in slices:
+            length = len(range(slc.start, slc.stop, slc.step))
             local_value, value = value[:length], value[length:]
             values.append(local_value)
 
         # If I still have items in value I need to append
         # them in the proper place
-        if len(value) > 0:
+        if value:
             try:
                 [x for x in values if len(x)][-1].extend(value)
             except IndexError:
@@ -398,7 +404,7 @@ class MergedSequence(MutableSequence):
         return values
 
 
-class OverridableMapping(MergedMapping):
+class OverridableMapping(MergedMapping):  # pylint: disable=too-many-ancestors
     """A MergedMapping with some rules to override keys in the hierarchy."""
 
     def __getitem__(self, key):
@@ -414,7 +420,7 @@ class OverridableMapping(MergedMapping):
         values = []
         for scope, keys in scope2keys:
             # No key in this scope, continue to the next
-            if len(keys) == 0:
+            if not keys:
                 continue
 
             # Append (scope, key) and break if this key

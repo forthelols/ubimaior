@@ -6,8 +6,11 @@ ubimaior
 .. image:: https://img.shields.io/pypi/v/ubimaior.svg
         :target: https://pypi.python.org/pypi/ubimaior
 
-.. image:: https://img.shields.io/travis/alalazo/ubimaior.svg
-        :target: https://travis-ci.org/alalazo/ubimaior
+.. image:: https://codecov.io/gh/forthelols/ubimaior/graph/badge.svg
+        :target: https://codecov.io/gh/forthelols/ubimaior
+
+.. image:: https://img.shields.io/travis/forthelols/ubimaior.svg
+        :target: https://travis-ci.org/forthelols/ubimaior
 
 .. image:: https://readthedocs.org/projects/ubimaior/badge/?version=latest
         :target: https://ubimaior.readthedocs.io/en/latest/?badge=latest

@@ -170,21 +170,45 @@ class TestAllMappings(object):
 
         mapping_nc['foo'] = 11
         assert mapping_nc['foo'] == 11
-        assert mapping_nc.mappings['highest']['foo'] == 11
-        assert mapping_nc.mappings['middle']['foo'] == 6
+
+        # OverridableMapping uses a top layer to override
+        # the overall result in the view
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['foo:'] == 11
+
+        # MergedMapping instead writes directly in the input mappings
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert mapping_nc.mappings['highest']['foo'] == 11
+            assert mapping_nc.mappings['middle']['foo'] == 6
 
         mapping_nc['bar'] = 'overwritten'
         assert mapping_nc['bar'] == 'overwritten'
-        assert 'bar' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
-        assert mapping_nc.mappings['lowest']['bar'] == '4'
+
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['bar:'] == 'overwritten'
+
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert 'bar' not in mapping_nc.mappings['highest']
+            assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
+            assert mapping_nc.mappings['lowest']['bar'] == '4'
 
         assert 'baz' not in mapping_nc.mappings['middle']
         mapping_nc['baz'] = True
         assert mapping_nc['baz'] is True
-        assert 'baz' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['baz'] is True
-        assert mapping_nc.mappings['lowest']['baz'] is False
+
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['baz:'] is True
+
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert 'baz' not in mapping_nc.mappings['highest']
+            assert mapping_nc.mappings['middle']['baz'] is True
+            assert mapping_nc.mappings['lowest']['baz'] is False
 
         with pytest.raises(TypeError) as excinfo:
             mapping_nc['foo'] = 'a_string'

@@ -26,7 +26,7 @@ def _is_tuple_str_mapping(obj):
 
 # pylint: disable=too-few-public-methods,abstract-method
 class _MappingBase(MutableMapping):
-    def __init__(self, mappings):
+    def __init__(self, mappings, maybe_empty=False):
         # Check the type of mappings, which should be a list of
         # (str, Mapping) tuples
         if not isinstance(mappings, list):
@@ -40,7 +40,7 @@ class _MappingBase(MutableMapping):
             raise TypeError(msg)
 
         # Check that the items in the list have the correct type
-        if not mappings:
+        if not mappings and not maybe_empty:
             msg = '"mappings" should contain one or more items (zero found)'
             raise ValueError(msg)
 
@@ -107,6 +107,13 @@ class _MappingBase(MutableMapping):
         for _, mapping in self.mappings.items():
             if key in mapping:
                 del mapping[key]
+
+    def __getattr__(self, item):
+        if item not in self.mappings:
+            msg = '{0} object has no attrobute {1}'
+            raise AttributeError(msg.format(type(self).__name__, item))
+
+        return self.mappings[item]
 
 
 def _convert_to_type_or_raise(current_type, key, value):
@@ -420,13 +427,34 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
     scratch_key = '_scratch_'
 
-    def __init__(self, mappings):
-        super(OverridableMapping, self).__init__(mappings)
+    def __init__(self, mappings, scratch_dict=None):
+        super(OverridableMapping, self).__init__(mappings, maybe_empty=True)
+        scratch_dict = {} if scratch_dict is None else scratch_dict
         self.mappings = collections.OrderedDict(
-            [(self.scratch_key, {})] + mappings
+            [(self.scratch_key, scratch_dict)] + mappings
         )
 
+    @staticmethod
+    def _check_key_or_raise(key):
+
+        # If the key is not convertible to string, raise an  exception.
+        # This limitation is currently due to how we override keys
+        # (appending a ':' after the key)
+        if not isinstance(key, str):
+            msg = 'unsupported key type [{0}]'.format(type(key))
+            raise TypeError(msg)
+
+        # Ending a key with ':' is reserved to the implementation to
+        # mark key that override everything in the hierarchy
+        if key.endswith(':'):
+            msg = ' a key cannot end with a \':\' character [{0}]'.format(key)
+            raise ValueError(msg)
+
     def __getitem__(self, key):
+        # Ensure that the key is of the correct type,
+        # and does not end with ':'
+        self._check_key_or_raise(key)
+
         # Check that we don't have more than one key once we applied the
         # overriding rules
         scope2keys = [  # (scope, [list of matching keys])
@@ -444,9 +472,9 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
             # Append (scope, key) and break if this key
             # was an overriding one
-            key = keys[0]
-            values.append((scope, self.mappings[scope][key]))
-            if key.endswith(':'):
+            current_key = keys[0]
+            values.append((scope, self.mappings[scope][current_key]))
+            if current_key.endswith(':'):
                 break
 
         # Mimic built-in if the key does not exist
@@ -456,11 +484,17 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         first_scope, first_value = values[0]
 
         if isinstance(first_value, MutableMapping):
-            # If we get to a nested dictionary
+            # The first scope is not scratch
             if first_scope != self.scratch_key:
-                self.mappings[self.scratch_key][key] = {}
+                self.mappings[self.scratch_key][current_key.rstrip(':')] = {}
+                scratch_dict = self.mappings[self.scratch_key][
+                    current_key.rstrip(':')
+                ]
+            else:
+                scratch_dict = first_value
+                values = values[1:]
 
-            return OverridableMapping(values)
+            return OverridableMapping(values, scratch_dict=scratch_dict)
 
         if isinstance(first_value, MutableSequence):
             return MergedSequence([value for _, value in values])
@@ -468,6 +502,10 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         return first_value
 
     def __setitem__(self, key, value):
+        # Ensure that the key is of the correct type,
+        # and does not end with ':'
+        self._check_key_or_raise(key)
+
         # Compute the key and its corresponding override
         key, override_key = key.rstrip(':'), key.rstrip(':') + ':'
         override_key_type = self._type_for_key_or_raise(override_key)
@@ -475,5 +513,15 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
         # Normalize the value or raise
         value = _convert_to_type_or_raise(current_type, key, value)
-
+        # If the scratch layer has 'key' already stored, pop it, then
+        # store 'key:' that overrides all the values below
+        self.scratch.pop(key, None)
         self.mappings[self.scratch_key][override_key] = value
+
+    def __getattr__(self, item):
+        item = self.scratch_key if item == 'scratch' else item
+        return super(OverridableMapping, self).__getattr__(item)
+
+    def _get_merged_keys(self):
+        keys = super(OverridableMapping, self)._get_merged_keys()
+        return [key for key in keys if not key.endswith(':')]

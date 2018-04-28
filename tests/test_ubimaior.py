@@ -251,6 +251,11 @@ class TestAllMappings(object):
 
         assert list(mapping_nc.keys()) == ['foo', 'bar', 'baz']
 
+    def test_accessing_non_existing_attribute(self, mapping_nc):
+        with pytest.raises(AttributeError) as excinfo:
+            mapping_nc.does_not_exist
+        assert 'object has no attribute' in str(excinfo.value)
+
 
 class TestMergedMapping(object):
 
@@ -295,9 +300,10 @@ class TestMergedMapping(object):
             merged['foo']
         assert 'type mismatch for key' in str(excinfo.value)
 
-    def test_setting_preferred_scope(self):
-        # TODO: write a test for this
-        pass
+    def test_setting_invalid_preferred_scope(self, mapping_l):
+        with pytest.raises(ValueError) as excinfo:
+            mapping_l.preferred_scope = 'does_not_exist'
+        assert 'is an invalid value for preferred scope' in str(excinfo.value)
 
     def test_setting_containers(self, mapping_l):
 
@@ -573,7 +579,9 @@ class TestMergedSequence(object):
         # enters comparison for MergedSequence objects
         assert list(not_really_equal) == sequence[:]
         assert not_really_equal != sequence
+        assert sequence != not_really_equal
 
+        assert sequence != [1, 2, 3, 4]
 
 class TestOverridableMapping(object):
     def test_reading_lists(self, overridable_l):

@@ -110,7 +110,7 @@ class _MappingBase(MutableMapping):
 
     def __getattr__(self, item):
         if item not in self.mappings:
-            msg = '{0} object has no attrobute {1}'
+            msg = '{0} object has no attribute {1}'
             raise AttributeError(msg.format(type(self).__name__, item))
 
         return self.mappings[item]
@@ -196,7 +196,7 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
                     self.preferred_scope == scope or \
                     key in item:
                 return scope
-        return None
+        return None  # pragma: no cover
 
     @property
     def preferred_scope(self):

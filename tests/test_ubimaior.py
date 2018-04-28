@@ -110,7 +110,7 @@ def mapping_d():
 
 
 @pytest.fixture()
-def overridable():
+def overridable_l():
     """An instance of a merged mapping, with list values."""
     highest_priority = {
         'foo': [11, 22],
@@ -138,6 +138,30 @@ def overridable():
     return merged
 
 
+@pytest.fixture()
+def overridable_d():
+    """An instance of a merged mapping, with list values."""
+    highest_priority = {
+        'foo': {'a': 1, 'b': {'xx': 1}},
+    }
+
+    middle_priority = {
+        'foo:': {'c': 2},
+    }
+
+    lowest_priority = {
+        'foo': {'d': 3},
+    }
+
+    merged = ubimaior.OverridableMapping([
+        ('highest', highest_priority),
+        ('middle', middle_priority),
+        ('lowest', lowest_priority)
+    ])
+
+    return merged
+
+
 class TestAllMappings(object):
     def test_errors_on_init(self, mapping_type):
         # not a list
@@ -149,11 +173,6 @@ class TestAllMappings(object):
         with pytest.raises(TypeError) as excinfo:
             mapping_type([1, 2, 3])
         assert 'items in "mappings" should be' in str(excinfo.value)
-
-        # one or more mapping is needed
-        with pytest.raises(ValueError) as excinfo:
-            mapping_type([])
-        assert '"mappings" should contain one or more' in str(excinfo.value)
 
     def test_reading_non_container_types(self, mapping_nc):
 
@@ -170,21 +189,45 @@ class TestAllMappings(object):
 
         mapping_nc['foo'] = 11
         assert mapping_nc['foo'] == 11
-        assert mapping_nc.mappings['highest']['foo'] == 11
-        assert mapping_nc.mappings['middle']['foo'] == 6
+
+        # OverridableMapping uses a top layer to override
+        # the overall result in the view
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['foo:'] == 11
+
+        # MergedMapping instead writes directly in the input mappings
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert mapping_nc.mappings['highest']['foo'] == 11
+            assert mapping_nc.mappings['middle']['foo'] == 6
 
         mapping_nc['bar'] = 'overwritten'
         assert mapping_nc['bar'] == 'overwritten'
-        assert 'bar' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
-        assert mapping_nc.mappings['lowest']['bar'] == '4'
+
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['bar:'] == 'overwritten'
+
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert 'bar' not in mapping_nc.mappings['highest']
+            assert mapping_nc.mappings['middle']['bar'] == 'overwritten'
+            assert mapping_nc.mappings['lowest']['bar'] == '4'
 
         assert 'baz' not in mapping_nc.mappings['middle']
         mapping_nc['baz'] = True
         assert mapping_nc['baz'] is True
-        assert 'baz' not in mapping_nc.mappings['highest']
-        assert mapping_nc.mappings['middle']['baz'] is True
-        assert mapping_nc.mappings['lowest']['baz'] is False
+
+        if isinstance(mapping_nc, ubimaior.OverridableMapping):
+            assert mapping_nc.mappings[
+                ubimaior.OverridableMapping.scratch_key
+            ]['baz:'] is True
+
+        if isinstance(mapping_nc, ubimaior.MergedMapping):
+            assert 'baz' not in mapping_nc.mappings['highest']
+            assert mapping_nc.mappings['middle']['baz'] is True
+            assert mapping_nc.mappings['lowest']['baz'] is False
 
         with pytest.raises(TypeError) as excinfo:
             mapping_nc['foo'] = 'a_string'
@@ -210,6 +253,12 @@ class TestAllMappings(object):
 
 
 class TestMergedMapping(object):
+
+    def test_errors_on_init(self):
+        # one or more mapping is needed
+        with pytest.raises(ValueError) as excinfo:
+            ubimaior.MergedMapping([])
+        assert '"mappings" should contain one or more' in str(excinfo.value)
 
     def test_reading_lists(self, mapping_l):
         assert mapping_l['foo'][:] == [1, 11, 111]
@@ -527,6 +576,74 @@ class TestMergedSequence(object):
 
 
 class TestOverridableMapping(object):
-    def test_reading_containers(self, overridable):
+    def test_reading_lists(self, overridable_l):
+        # foo is overridden
+        assert list(overridable_l['foo']) == [11, 22, 'a', 'b']
 
-        assert list(overridable['foo']) == [11, 22, 'a', 'b']
+        # bar and baz should behave as MergedSequence
+        assert list(overridable_l['baz']) == [1, 2, 3, 4, 5, 6]
+        assert list(overridable_l['bar']) == ['a', 'b']
+
+    @pytest.mark.xfail
+    def test_views_are_immutable(self, overridable_l):
+        # FIXME: this should return an immutable sequence, instead
+        # FIXME: of a mutable one
+        with pytest.raises(AttributeError):
+            overridable_l['foo'].append(1)
+
+        with pytest.raises(TypeError):
+            overridable_l['foo'][0] = 2
+
+        with pytest.raises(TypeError):
+            del overridable_l['foo'][0]
+
+    def test_setting_lists(self, overridable_l):
+
+        overridable_l['foo'] = [1, 2, 3]
+
+        assert list(overridable_l['foo']) == [1, 2, 3]
+        assert overridable_l.scratch['foo:'] == [1, 2, 3]
+        assert overridable_l.highest['foo'] == [11, 22]
+
+    def test_setting_dicts(self, overridable_d):
+
+        assert dict(overridable_d['foo'].items()) == {
+            'a': 1,
+            'b': {'xx': 1},
+            'c': 2
+        }
+        # Getting a key creates an empty dictionary in scratch
+        assert overridable_d.scratch['foo'] == {'b': {}}
+
+        # Setting nested keys
+        overridable_d['foo']['c'] = 4
+        # assert overridable_d.scratch
+        assert dict(overridable_d['foo'].items()) == {
+            'a': 1,
+            'b': {'xx': 1},
+            'c': 4
+        }
+        assert overridable_d.scratch['foo'] == {'b': {}, 'c:': 4}
+
+        overridable_d['foo'] = {'a': 1}
+        assert dict(overridable_d['foo'].items()) == {'a': 1}
+        assert overridable_d.highest['foo'] == {'a': 1, 'b': {'xx': 1}}
+
+    def test_using_invalid_keys(self, overridable_d):
+
+        with pytest.raises(TypeError) as excinfo:
+            key = (1, 2)
+            overridable_d[key] = None
+        msg = str(excinfo.value)
+        assert 'unsupported key type' in msg
+
+        with pytest.raises(TypeError) as excinfo:
+            key = (1, 2)
+            overridable_d[key]
+        msg = str(excinfo.value)
+        assert 'unsupported key type' in msg
+
+        with pytest.raises(ValueError) as excinfo:
+            overridable_d['foo:'] = None
+        msg = str(excinfo.value)
+        assert 'a key cannot end with a' in msg

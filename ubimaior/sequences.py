@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Hierarchical sequences"""
+"""Contain classes and functions that help to manage merged sequences"""
 import itertools
 
 try:
@@ -23,9 +23,28 @@ def _raise_if_not_slice_or_integer(item):
 
 
 class MergedSequence(Sequence):
-    """TODO: write a docstring"""
+    """Non-mutable view over a list of sequences.
+
+    An object of this type is created passing the list of sequences on
+    initialization. It behaves like a single non-mutable sequence
+    (i.e. a tuple) composed chaining all the inputs.
+
+    Args:
+        sequences (list): list of sequences that constitute the view
+
+    Raises:
+        TypeError: when sequences is not a list of sequences
+
+    Examples:
+
+        >>> view = ubimaior.MergedSequence([[1, 2], (3, 4), (5, 6, 7)])
+        >>> assert tuple(view) == (1, 2, 3, 4, 5, 6, 7)
+        >>> view[1:3]
+        (2, 3)
+    """
 
     _type_to_accept = Sequence
+    _builtin_return_type = tuple
 
     def __init__(self, sequences):
         # Check that sequences is a list of sequences
@@ -46,7 +65,7 @@ class MergedSequence(Sequence):
         # Handle slices
         if isinstance(idx, slice):
             iterator = itertools.chain(*self.sequences)
-            return list(
+            return self._builtin_return_type(
                 itertools.islice(iterator, idx.start, idx.stop, idx.step)
             )
 
@@ -80,16 +99,48 @@ class MergedSequence(Sequence):
 
         raise IndexError('list index out of range')
 
+    def __eq__(self, other):
+        # Following what built-in lists do, compare False to
+        # other types.
+        if isinstance(other, type(self)):
+            if len(self) != len(other):
+                return False
+
+            for rsequence, lsequence in zip(self.sequences, other.sequences):
+                if rsequence != lsequence:
+                    return False
+                return True
+
+        return NotImplemented
+
 
 # pylint: disable=too-many-ancestors
 class MergedMutableSequence(MutableSequence, MergedSequence):
-    """Shows a list of sequences with different levels of priority as
-    they were a single one.
+    """Like a ``MergedSequence``, but provides a mutable view over the list
+    of sequences.
 
-    TODO: write something about merging and write rules
+    As this class permits mutable operations, it may modify the sequences that
+    are passed to it during initialization.
+
+    Args:
+          sequences (list): list of mutable sequences that constitute the view
+
+    Raises:
+        TypeError: when sequences is not a list of mutable sequences
+
+    Examples:
+
+        >>> view = ubimaior.MergedMutableSequence([[1, 2], [3, 4], [5, 6, 7]])
+        >>> assert view[:] == [1, 2, 3, 4, 5, 6, 7]
+        >>> view[1:3]
+        [2, 3]
+        >>> view[1:3] = []
+        >>> list(view)
+        [1, 4, 5, 6, 7]
     """
 
     _type_to_accept = MutableSequence
+    _builtin_return_type = list
 
     def __setitem__(self, idx, value):
         _raise_if_not_slice_or_integer(idx)
@@ -147,20 +198,6 @@ class MergedMutableSequence(MutableSequence, MergedSequence):
                 self.sequences[-1].append(value)
             else:
                 self.sequences[0].insert(0, value)
-
-    def __eq__(self, other):
-        # Following what built-in lists do, compare False to
-        # other types.
-        if isinstance(other, MergedMutableSequence):
-            if len(self) != len(other):
-                return False
-
-            for rsequence, lsequence in zip(self.sequences, other.sequences):
-                if rsequence != lsequence:
-                    return False
-                return True
-
-        return NotImplemented
 
     def _split_slice(self, idx):
         """Given a slice for the merged list, returns a list of slices for

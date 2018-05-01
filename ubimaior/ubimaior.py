@@ -5,9 +5,11 @@ import itertools
 
 try:
     import collections
+    from collections.abc import Sequence
     from collections.abc import MutableMapping, MutableSequence, Iterable
 except ImportError:
     import collections
+    from collections import Sequence
     from collections import MutableMapping, MutableSequence, Iterable
 
 
@@ -163,7 +165,7 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             ])
 
         if isinstance(values[0], MutableSequence):
-            return MergedSequence(values)
+            return MergedMutableSequence(values)
 
         return values[0]
 
@@ -229,12 +231,11 @@ def _raise_if_not_slice_or_integer(item):
         raise TypeError(msg)
 
 
-class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
-    """Shows a list of sequences with different levels of priority as
-    they were a single one.
+class MergedSequence(Sequence):
+    """TODO: write a docstring"""
 
-    TODO: write something about merging and write rules
-    """
+    _type_to_accept = Sequence
+
     def __init__(self, sequences):
         # Check that sequences is a list of sequences
         if not isinstance(sequences, list):
@@ -242,7 +243,7 @@ class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
             raise TypeError(msg)
 
         # Check that the items in the list have the correct type
-        if any(not isinstance(x, MutableSequence) for x in sequences):
+        if any(not isinstance(x, self._type_to_accept) for x in sequences):
             msg = 'items in "sequences" should be MutableSequences'
             raise TypeError(msg)
 
@@ -264,6 +265,40 @@ class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
 
     def __len__(self):
         return sum([len(x) for x in self.sequences])
+
+    def _return_item_and_index(self, idx):
+        """Given an index that refers to the merged list, return the index of
+        the item in ``sequences`` that holds the item and its local index.
+
+        Args:
+            idx (int): index in the merged list
+
+        Returns:
+            item_idx, idx (int): index of the sequence and of the item
+                in the sequence
+
+        Raises:
+            IndexError: if ``idx`` is out of range
+        """
+        idx = len(self) + idx if idx < 0 else idx
+
+        for counter, sequence in enumerate(self.sequences):
+            if idx < len(sequence):
+                return counter, idx
+            idx -= len(sequence)
+
+        raise IndexError('list index out of range')
+
+
+# pylint: disable=too-many-ancestors
+class MergedMutableSequence(MutableSequence, MergedSequence):
+    """Shows a list of sequences with different levels of priority as
+    they were a single one.
+
+    TODO: write something about merging and write rules
+    """
+
+    _type_to_accept = MutableSequence
 
     def __setitem__(self, idx, value):
         _raise_if_not_slice_or_integer(idx)
@@ -325,7 +360,7 @@ class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
     def __eq__(self, other):
         # Following what built-in lists do, compare False to
         # other types.
-        if isinstance(other, MergedSequence):
+        if isinstance(other, MergedMutableSequence):
             if len(self) != len(other):
                 return False
 
@@ -335,29 +370,6 @@ class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
                 return True
 
         return NotImplemented
-
-    def _return_item_and_index(self, idx):
-        """Given an index that refers to the merged list, return the index of
-        the item in ``sequences`` that holds the item and its local index.
-
-        Args:
-            idx (int): index in the merged list
-
-        Returns:
-            item_idx, idx (int): index of the sequence and of the item
-                in the sequence
-
-        Raises:
-            IndexError: if ``idx`` is out of range
-        """
-        idx = len(self) + idx if idx < 0 else idx
-
-        for counter, sequence in enumerate(self.sequences):
-            if idx < len(sequence):
-                return counter, idx
-            idx -= len(sequence)
-
-        raise IndexError('list index out of range')
 
     def _split_slice(self, idx):
         """Given a slice for the merged list, returns a list of slices for

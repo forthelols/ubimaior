@@ -12,7 +12,7 @@ from ubimaior import ubimaior
 @pytest.fixture()
 def sequence():
     """An instance of a merged sequence """
-    return ubimaior.MergedSequence([
+    return ubimaior.MergedMutableSequence([
         [1, 2, 3],
         ['a', 'b', 'c'],
         [False, True, None],
@@ -326,12 +326,12 @@ class TestMergedSequence(object):
 
         # not a list
         with pytest.raises(TypeError) as excinfo:
-            ubimaior.MergedSequence('not_the_correct_type')
+            ubimaior.MergedMutableSequence('not_the_correct_type')
         assert '"sequences" should be a list' in str(excinfo.value)
 
         # items are not of the correct type
         with pytest.raises(TypeError) as excinfo:
-            ubimaior.MergedSequence([1, 2, 3])
+            ubimaior.MergedMutableSequence([1, 2, 3])
         assert 'items in "sequences" should be' in str(excinfo.value)
 
     def test_getting_items(self, sequence):
@@ -361,7 +361,7 @@ class TestMergedSequence(object):
         lists = [[1, 2, 3], ['a', 'b', 'c']]
         dicts = [{1: 'foo'}]
 
-        m = ubimaior.MergedSequence([lists, dicts])
+        m = ubimaior.MergedMutableSequence([lists, dicts])
 
         assert len(m) == 3
 
@@ -554,7 +554,7 @@ class TestMergedSequence(object):
 
         normal_list = sequence[:]
 
-        another_sequence = ubimaior.MergedSequence([
+        another_sequence = ubimaior.MergedMutableSequence([
             [1, 2, 3],
             ['a', 'b', 'c'],
             [False, True, None],
@@ -568,7 +568,7 @@ class TestMergedSequence(object):
         assert sequence == another_sequence
         assert another_sequence == sequence
 
-        not_really_equal = ubimaior.MergedSequence([
+        not_really_equal = ubimaior.MergedMutableSequence([
             [1, 2],
             [3, 'a', 'b', 'c'],
             [False],
@@ -592,10 +592,7 @@ class TestOverridableMapping(object):
         assert list(overridable_l['baz']) == [1, 2, 3, 4, 5, 6]
         assert list(overridable_l['bar']) == ['a', 'b']
 
-    @pytest.mark.xfail
     def test_views_are_immutable(self, overridable_l):
-        # FIXME: this should return an immutable sequence, instead
-        # FIXME: of a mutable one
         with pytest.raises(AttributeError):
             overridable_l['foo'].append(1)
 

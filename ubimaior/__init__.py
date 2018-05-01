@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Top-level package for ubimaior."""
+"""Manage hierarchy of objects as if they were one"""
 
 __author__ = """Massimiliano Culpo"""
 __email__ = 'massimiliano.culpo@gmail.com'

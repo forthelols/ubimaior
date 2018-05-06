@@ -26,15 +26,30 @@ def _is_tuple_str_mapping(obj):
         isinstance(obj[0], str) and isinstance(obj[1], MutableMapping)
 
 
-def _convert_to_type_or_raise(current_type, key, value):
-    if current_type != type(value) and current_type is not None:
+def _convert_to_type_or_raise(target_type, key, value):
+    """Tries to convert value to a target type. Used when
+    setting items in mappings.
+
+    Args:
+        target_type: the target type for conversion
+        key: originating key - used in the error message
+        value: value to be converted
+
+    Returns:
+        target_type(value)
+
+    Raises:
+        TypeError: if any error occurs during the conversion
+    """
+
+    if target_type != type(value) and target_type is not None:
         try:
-            value = current_type(value)
+            value = target_type(value)
         except Exception:
             msg = 'cannot assign value of type {0} to key "{1}"'
             msg += '[{0} is not convertible to {2}]'
             raise TypeError(msg.format(
-                type(value).__name__, key, current_type.__name__
+                type(value).__name__, key, target_type.__name__
             ))
     return value
 
@@ -132,12 +147,40 @@ class _MappingBase(MutableMapping):
 
 
 class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
-    """Shows a list of mappings with different levels of priority as
-    they were a single one.
+    """Shows a list of mappings as if they were a single one.
 
-    TODO: write something about merging and write rules
+    A ``MergedMapping`` merges a list of mappings based on priority
+    levels. Items coming first in the input list have higher priority.
 
-    FIXME: Is this implementable in terms of collections.ChainMap?
+    When displaying entries of non-container type, the one with the
+    highest priority wins. When displaying entries holding a container
+    type the class is recursive, and either a ``MergedMutableSequence``
+    or a ``MergedMapping`` are returned.
+
+    This class takes ownership of the input, and modifies it when mutable
+    operations are invoked.
+
+    Args:
+        mappings (list): list of tuples of the form ``(scope, mapping)``.
+            ``scope`` is a name used to identify the scope.
+        preferred_scope (str, optional): preferred scope for writing
+
+    Examples:
+        >>> import ubimaior
+        >>> highest_priority = {'foo': {'a': 1}, 'baz': {'a': [1, 2, 3]}}
+        >>> middle_priority = {'foo': {'a': 11, 'b': 22}, 'bar': {'a': 'one'}}
+        >>> lowest_priority = {
+        ...     'foo': {'c': 111},
+        ...     'bar': {'b': 'two'},
+        ...     'baz': {'a': [4, 5, 6]}
+        ... }
+        >>>  merged = ubimaior.MergedMapping([
+        ...     ('highest', highest_priority),
+        ...     ('middle', middle_priority),
+        ...     ('lowest', lowest_priority)
+        ...  ])
+        >>> [idx for idx in merged['baz']['a']]
+        [1, 2, 3, 4, 5, 6]
     """
 
     #: Caches the setting of the preferred scope
@@ -170,10 +213,6 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         return values[0]
 
     def __setitem__(self, key, value):
-        # TODO: add an option to be strict on the scope, and fail
-        # TODO: with an error? This will be useful if we want to write
-        # TODO: only in a single scope.
-
         # Check that the type of value is compatible with
         current_type = self._type_for_key_or_raise(key)
         value = _convert_to_type_or_raise(current_type, key, value)
@@ -218,7 +257,24 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
 
 class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
-    """A MergedMapping with some rules to override keys in the hierarchy."""
+    """Shows a list of mapping as if they were a single one.
+
+    An ``OverridableMapping`` merges a list of mappings recursively based on
+    priority levels. It only accepts strings as keys.
+
+    Whenever a key in one of the mappings finishes with the character `:`
+    it overrides the same keys at lower levels of priority.
+
+    This class doesn't write over the input dictionaries in case of changes,
+    instead it writes in a temporary scratch level that is at the highest
+    possible priority.
+
+    Args:
+        mappings (list): list of tuples of the form ``(scope, mapping)``.
+            ``scope`` is a name used to identify the scope.
+        scratch_dict (MutableMapping, optional): dictionary to be used as
+            scratch
+    """
 
     scratch_key = '_scratch_'
 
@@ -260,6 +316,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         # TODO: check for len(keys) > 1 and raise if necessary
 
         values = []
+        current_key = None
         for scope, keys in scope2keys:
             # No key in this scope, continue to the next
             if not keys:

@@ -3,12 +3,14 @@
 
 import itertools
 
+from . import sequences
+
 try:
     import collections
-    from collections.abc import MutableMapping, MutableSequence, Iterable
+    from collections.abc import MutableMapping, MutableSequence
 except ImportError:
     import collections
-    from collections import MutableMapping, MutableSequence, Iterable
+    from collections import MutableMapping, MutableSequence
 
 
 def _is_tuple_str_mapping(obj):
@@ -22,6 +24,34 @@ def _is_tuple_str_mapping(obj):
     """
     return isinstance(obj, tuple) and len(obj) == 2 and \
         isinstance(obj[0], str) and isinstance(obj[1], MutableMapping)
+
+
+def _convert_to_type_or_raise(target_type, key, value):
+    """Tries to convert value to a target type. Used when
+    setting items in mappings.
+
+    Args:
+        target_type: the target type for conversion
+        key: originating key - used in the error message
+        value: value to be converted
+
+    Returns:
+        target_type(value)
+
+    Raises:
+        TypeError: if any error occurs during the conversion
+    """
+
+    if target_type != type(value) and target_type is not None:
+        try:
+            value = target_type(value)
+        except Exception:
+            msg = 'cannot assign value of type {0} to key "{1}"'
+            msg += '[{0} is not convertible to {2}]'
+            raise TypeError(msg.format(
+                type(value).__name__, key, target_type.__name__
+            ))
+    return value
 
 
 # pylint: disable=too-few-public-methods,abstract-method
@@ -116,26 +146,41 @@ class _MappingBase(MutableMapping):
         return self.mappings[item]
 
 
-def _convert_to_type_or_raise(current_type, key, value):
-    if current_type != type(value) and current_type is not None:
-        try:
-            value = current_type(value)
-        except Exception:
-            msg = 'cannot assign value of type {0} to key "{1}"'
-            msg += '[{0} is not convertible to {2}]'
-            raise TypeError(msg.format(
-                type(value).__name__, key, current_type.__name__
-            ))
-    return value
-
-
 class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
-    """Shows a list of mappings with different levels of priority as
-    they were a single one.
+    """Shows a list of mappings as if they were a single one.
 
-    TODO: write something about merging and write rules
+    A ``MergedMapping`` merges a list of mappings based on priority
+    levels. Items coming first in the input list have higher priority.
 
-    FIXME: Is this implementable in terms of collections.ChainMap?
+    When displaying entries of non-container type, the one with the
+    highest priority wins. When displaying entries holding a container
+    type the class is recursive, and either a ``MergedMutableSequence``
+    or a ``MergedMapping`` are returned.
+
+    This class takes ownership of the input, and modifies it when mutable
+    operations are invoked.
+
+    Args:
+        mappings (list): list of tuples of the form ``(scope, mapping)``.
+            ``scope`` is a name used to identify the scope.
+        preferred_scope (str, optional): preferred scope for writing
+
+    Examples:
+        >>> import ubimaior
+        >>> highest_priority = {'foo': {'a': 1}, 'baz': {'a': [1, 2, 3]}}
+        >>> middle_priority = {'foo': {'a': 11, 'b': 22}, 'bar': {'a': 'one'}}
+        >>> lowest_priority = {
+        ...     'foo': {'c': 111},
+        ...     'bar': {'b': 'two'},
+        ...     'baz': {'a': [4, 5, 6]}
+        ... }
+        >>>  merged = ubimaior.MergedMapping([
+        ...     ('highest', highest_priority),
+        ...     ('middle', middle_priority),
+        ...     ('lowest', lowest_priority)
+        ...  ])
+        >>> [idx for idx in merged['baz']['a']]
+        [1, 2, 3, 4, 5, 6]
     """
 
     #: Caches the setting of the preferred scope
@@ -163,15 +208,11 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             ])
 
         if isinstance(values[0], MutableSequence):
-            return MergedSequence(values)
+            return sequences.MergedMutableSequence(values)
 
         return values[0]
 
     def __setitem__(self, key, value):
-        # TODO: add an option to be strict on the scope, and fail
-        # TODO: with an error? This will be useful if we want to write
-        # TODO: only in a single scope.
-
         # Check that the type of value is compatible with
         current_type = self._type_for_key_or_raise(key)
         value = _convert_to_type_or_raise(current_type, key, value)
@@ -215,215 +256,25 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         self._preferred_scope = value
 
 
-def _raise_if_not_slice_or_integer(item):
-    """Raise a TypeError if the argument is not a slice or an integer.
+class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
+    """Shows a list of mapping as if they were a single one.
+
+    An ``OverridableMapping`` merges a list of mappings recursively based on
+    priority levels. It only accepts strings as keys.
+
+    Whenever a key in one of the mappings finishes with the character `:`
+    it overrides the same keys at lower levels of priority.
+
+    This class doesn't write over the input dictionaries in case of changes,
+    instead it writes in a temporary scratch level that is at the highest
+    possible priority.
 
     Args:
-        item: object to be checked
-
-    Raises:
-        TypeError: when ``not isinstance(item, (slice, int))``
+        mappings (list): list of tuples of the form ``(scope, mapping)``.
+            ``scope`` is a name used to identify the scope.
+        scratch_dict (MutableMapping, optional): dictionary to be used as
+            scratch
     """
-    if not isinstance(item, (slice, int)):
-        msg = 'list indices must be integers or slices, not str'
-        raise TypeError(msg)
-
-
-class MergedSequence(MutableSequence):  # pylint: disable=too-many-ancestors
-    """Shows a list of sequences with different levels of priority as
-    they were a single one.
-
-    TODO: write something about merging and write rules
-    """
-    def __init__(self, sequences):
-        # Check that sequences is a list of sequences
-        if not isinstance(sequences, list):
-            msg = '"sequences" should be a list of sequences'
-            raise TypeError(msg)
-
-        # Check that the items in the list have the correct type
-        if any(not isinstance(x, MutableSequence) for x in sequences):
-            msg = 'items in "sequences" should be MutableSequences'
-            raise TypeError(msg)
-
-        self.sequences = sequences
-
-    def __getitem__(self, idx):
-        _raise_if_not_slice_or_integer(idx)
-
-        # Handle slices
-        if isinstance(idx, slice):
-            iterator = itertools.chain(*self.sequences)
-            return list(
-                itertools.islice(iterator, idx.start, idx.stop, idx.step)
-            )
-
-        # Handle integers
-        item_idx, idx = self._return_item_and_index(idx)
-        return self.sequences[item_idx][idx]
-
-    def __len__(self):
-        return sum([len(x) for x in self.sequences])
-
-    def __setitem__(self, idx, value):
-        _raise_if_not_slice_or_integer(idx)
-
-        # Mimic built-in list for this case
-        if isinstance(idx, slice) and not isinstance(value, Iterable):
-            raise TypeError('can only assign an iterable')
-
-        # Handle slices
-        if isinstance(idx, slice):
-            # TODO: extend to slices of stride different from 1
-            if isinstance(idx.step, int) and idx.step != 1:
-                msg = 'attempt to use an extended slice with step {0}'
-                msg += ' [Only step == 1 is allowed]'
-                raise ValueError(msg.format(idx.step))
-
-            slices = self._split_slice(idx)
-            values = self._split_value(value, slices)
-            for sequence, index, val in zip(self.sequences, slices, values):
-                sequence[index] = val
-            return
-
-        # Handle integers
-        item_idx, idx = self._return_item_and_index(idx)
-        self.sequences[item_idx][idx] = value
-
-    def __delitem__(self, idx):
-        _raise_if_not_slice_or_integer(idx)
-
-        # Handle slices
-        if isinstance(idx, slice):
-            slices = self._split_slice(idx)
-            for sequence, index in zip(self.sequences, slices):
-                del sequence[index]
-            return
-
-        # Handle integers
-        item_idx, idx = self._return_item_and_index(idx)
-        del self.sequences[item_idx][idx]
-
-    def insert(self, index, value):
-        if not isinstance(index, int):
-            msg = '\'{0}\' object cannot be interpreted as an integer'
-            raise TypeError(msg.format(type(index).__name__))
-
-        try:
-            item_idx, index = self._return_item_and_index(index)
-            self.sequences[item_idx].insert(index, value)
-        except IndexError:
-            # An IndexError means we are outside the bounds of
-            # the current list. In this case built-in lists insert
-            # the value as first or last element, depending in which
-            # direction we went out of bounds
-            if index > 0:
-                self.sequences[-1].append(value)
-            else:
-                self.sequences[0].insert(0, value)
-
-    def __eq__(self, other):
-        # Following what built-in lists do, compare False to
-        # other types.
-        if isinstance(other, MergedSequence):
-            if len(self) != len(other):
-                return False
-
-            for rsequence, lsequence in zip(self.sequences, other.sequences):
-                if rsequence != lsequence:
-                    return False
-                return True
-
-        return NotImplemented
-
-    def _return_item_and_index(self, idx):
-        """Given an index that refers to the merged list, return the index of
-        the item in ``sequences`` that holds the item and its local index.
-
-        Args:
-            idx (int): index in the merged list
-
-        Returns:
-            item_idx, idx (int): index of the sequence and of the item
-                in the sequence
-
-        Raises:
-            IndexError: if ``idx`` is out of range
-        """
-        idx = len(self) + idx if idx < 0 else idx
-
-        for counter, sequence in enumerate(self.sequences):
-            if idx < len(sequence):
-                return counter, idx
-            idx -= len(sequence)
-
-        raise IndexError('list index out of range')
-
-    def _split_slice(self, idx):
-        """Given a slice for the merged list, returns a list of slices for
-        the underlying items.
-
-        Args:
-            idx (slice): slice referring to the merged list
-
-        Returns:
-            a list of slices associated with the managed items
-        """
-        slices = []
-
-        # Normalize to this length
-        idx = slice(*idx.indices(len(self)))
-
-        for sequence in self.sequences:
-            def next_slice(slc, seq):
-                """Gives the next slice of a merged sequence"""
-                start = max(slc.start - len(seq), 0)
-                stop = max(slc.stop - len(seq), 0)
-                return slice(start, stop, slc.step)
-
-            local_indices = idx.indices(len(sequence))
-            slices.append(slice(*local_indices))
-            idx = next_slice(idx, sequence)
-
-        return slices
-
-    def _split_value(self, value, slices):
-        """Split a list of values meant for the merged list, to components
-        associated with each underlying item.
-
-        Args:
-            value (list of values): items to be assigned to the merged list
-            slices (list of slices): list of slices returned by
-                ``_split_slice``
-
-        Returns:
-            components associated with the underlying list
-        """
-        values = []
-
-        for slc in slices:
-            length = len(range(slc.start, slc.stop, slc.step))
-            local_value, value = value[:length], value[length:]
-            values.append(local_value)
-
-        # If I still have items in value I need to append
-        # them in the proper place
-        if value:
-            try:
-                [x for x in values if len(x)][-1].extend(value)
-            except IndexError:
-                # All the slices are empty
-                next(
-                    (v for sl, v, x in zip(slices, values, self.sequences)
-                     if sl.start < len(x)),
-                    values[-1]
-                ).extend(value)
-
-        return values
-
-
-class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
-    """A MergedMapping with some rules to override keys in the hierarchy."""
 
     scratch_key = '_scratch_'
 
@@ -465,6 +316,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         # TODO: check for len(keys) > 1 and raise if necessary
 
         values = []
+        current_key = None
         for scope, keys in scope2keys:
             # No key in this scope, continue to the next
             if not keys:
@@ -497,7 +349,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             return OverridableMapping(values, scratch_dict=scratch_dict)
 
         if isinstance(first_value, MutableSequence):
-            return MergedSequence([value for _, value in values])
+            return sequences.MergedSequence([value for _, value in values])
 
         return first_value
 

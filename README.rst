@@ -3,23 +3,25 @@ ubimaior
 ========
 
 
-.. image:: https://img.shields.io/pypi/v/ubimaior.svg
+.. .. image:: https://img.shields.io/pypi/v/ubimaior.svg
         :target: https://pypi.python.org/pypi/ubimaior
 
-.. image:: https://codecov.io/gh/forthelols/ubimaior/graph/badge.svg
-        :target: https://codecov.io/gh/forthelols/ubimaior
+.. image:: https://ci.appveyor.com/api/projects/status/5hn47fnn05kqvubs?svg=true
+        :target: https://ci.appveyor.com/project/alalazo/ubimaior
 
 .. image:: https://img.shields.io/travis/forthelols/ubimaior.svg
         :target: https://travis-ci.org/forthelols/ubimaior
 
-.. image:: https://readthedocs.org/projects/ubimaior/badge/?version=latest
+.. image:: https://codecov.io/gh/forthelols/ubimaior/graph/badge.svg
+        :target: https://codecov.io/gh/forthelols/ubimaior
+
+.. .. image:: https://readthedocs.org/projects/ubimaior/badge/?version=latest
         :target: https://ubimaior.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-.. image:: https://pyup.io/repos/github/alalazo/ubimaior/shield.svg
-     :target: https://pyup.io/repos/github/alalazo/ubimaior/
-     :alt: Updates
-
+.. .. image:: https://pyup.io/repos/github/alalazo/ubimaior/shield.svg
+        :target: https://pyup.io/repos/github/alalazo/ubimaior/
+        :alt: Updates
 
 .. FIXME: Add a short description
 

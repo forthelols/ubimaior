@@ -15,3 +15,6 @@ __all__ = [
     'MergedMapping',
     'OverridableMapping'
 ]
+
+# A few mnemonic constant
+JSON = 'json'

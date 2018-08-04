@@ -3,6 +3,8 @@
 
 import itertools
 
+import six
+
 from . import sequences
 
 try:
@@ -287,11 +289,10 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
     @staticmethod
     def _check_key_or_raise(key):
-
         # If the key is not convertible to string, raise an  exception.
         # This limitation is currently due to how we override keys
         # (appending a ':' after the key)
-        if not isinstance(key, str):
+        if not isinstance(key, six.string_types):
             msg = 'unsupported key type [{0}]'.format(type(key))
             raise TypeError(msg)
 

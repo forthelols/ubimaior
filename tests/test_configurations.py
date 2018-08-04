@@ -29,8 +29,57 @@ class TestBasicAPI(object):
         assert config_nc.middle == {'foo': 6, 'bar': 'this_is_bar'}
 
         # Call using default values
-        config_nc_default = ubimaior.configurations.load(
-            'config_nc', scopes=mock_scopes
-        )
+        ubimaior.configurations.set_default_scopes(mock_scopes)
+        ubimaior.configurations.set_default_format(ubimaior.JSON)
+        config_nc_default = ubimaior.configurations.load('config_nc')
 
         assert config_nc == config_nc_default
+
+    def test_set_wrong_defaults(self):
+        # Scopes
+        with pytest.raises(TypeError):
+            ubimaior.configurations.set_default_scopes('ll')
+
+        with pytest.raises(TypeError):
+            ubimaior.configurations.set_default_scopes([1, 2])
+
+        with pytest.raises(TypeError):
+            ubimaior.configurations.set_default_scopes([('a',), ('b', 'dir')])
+
+        # Formats
+        with pytest.raises(TypeError):
+            ubimaior.configurations.set_default_format(1)
+
+        with pytest.raises(ValueError):
+            ubimaior.configurations.set_default_format('toml')
+
+    def test_default_settings(self):
+        # Check that all the keys allowed in the settings are there
+        assert all(x in ubimaior.configurations.ConfigSettings.valid_settings
+                   for x in ubimaior.configurations.DEFAULTS)
+
+        assert not any(x not in ubimaior.configurations.ConfigSettings.valid_settings
+                       for x in ubimaior.configurations.DEFAULTS)
+
+        assert len(ubimaior.configurations.DEFAULTS) == 3
+
+        # Iterate through the keys and check that they are initialized to None.
+        default = ubimaior.configurations.ConfigSettings()
+        for setting in default:
+            assert default[setting] is None
+            assert getattr(default, setting) is None
+
+        # Try to delete an item
+        del default['scopes']
+        assert len(default) == 2
+
+        # Assigning that key is still valid
+        default['scopes'] = [('single', 'somedir')]
+
+        # Assigning other settings is an error
+        with pytest.raises(KeyError):
+            default['somesetting'] = 1
+
+        # Trying to access an attribute that is not supported
+        with pytest.raises(AttributeError):
+            default.does_not_exist

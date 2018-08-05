@@ -15,6 +15,20 @@ def mock_scopes():
     ]
 
 
+@pytest.fixture()
+def tmp_scopes(tmpdir):
+    highest = tmpdir.mkdir('highest')
+    middle = tmpdir.mkdir('middle')
+    doesnotexist = os.path.join(str(tmpdir), 'doesnotexist')
+    lowest = tmpdir.mkdir('lowest')
+    return [
+        ('highest', str(highest)),
+        ('middle', str(middle)),
+        ('doesnotexist', doesnotexist),
+        ('lowest', str(lowest))
+    ]
+
+
 class TestBasicAPI(object):
     def test_loading_configurations(self, mock_scopes):
         # Try to call passing all the parameters explicitly
@@ -83,3 +97,27 @@ class TestBasicAPI(object):
         # Trying to access an attribute that is not supported
         with pytest.raises(AttributeError):
             default.does_not_exist
+
+    def test_dumping_configurations(self, mock_scopes, tmp_scopes):
+        # Load the test configurations
+        ubimaior.configurations.set_default_scopes(mock_scopes)
+        ubimaior.configurations.set_default_format(ubimaior.JSON)
+        cfg = ubimaior.configurations.load('config_nc')
+
+        # Dump them somewhere
+        ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+
+        # Reload and check
+        cfg_dumped = ubimaior.configurations.load('config_nc', scopes=tmp_scopes)
+
+        assert cfg == cfg_dumped
+
+        # Check that I can't have modifications in scratch when dumping
+        cfg['foobar'] = [1, 2, 3]
+        with pytest.raises(ValueError):
+            ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+
+        # Check that scopes ust match when dumping
+        tmp_scopes[2:] = []
+        with pytest.raises(ValueError):
+            ubimaior.configurations.dump(cfg_dumped, 'config_nc', scopes=tmp_scopes)

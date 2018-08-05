@@ -123,7 +123,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
     value from the default settings.
 
     Args:
-        config_name (str): name of the configuration part to load
+        config_name (str): name of the configuration files to load
         scopes (list or None): list of ``(name, directory)`` tuples that
             represent the scopes of the hierarchical configuration
         config_format (str or None): format of the configuration files
@@ -134,11 +134,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
     """
 
     # Retrieve default values
-    settings = ConfigSettings()
-    settings['scopes'] = scopes or DEFAULTS['scopes']
-    settings['format'] = config_format or DEFAULTS['format']
-    # TODO: still to be implemented
-    settings['schema'] = schema or DEFAULTS['schema']
+    settings = _retrieve_settings(scopes, config_format, schema)
 
     # Construct the filename of the configuration
     config_filename = config_name + '.' + settings.format
@@ -161,3 +157,84 @@ def load(config_name, scopes=None, config_format=None, schema=None):
             mappings.append((scope_name, reader.load(partial_cfg)))
 
     return ubimaior.mappings.OverridableMapping(mappings)
+
+
+def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
+    """Loads a hierarchical configuration into an object.
+
+    Leaving None in any of the optional arguments below means to read its
+    value from the default settings.
+
+    Args:
+        cfg: hierarchical configuration object to be dumped
+        config_name (str): name of the configuration files where to dump
+            the object
+        scopes (list or None): list of ``(name, directory)`` tuples that
+            represent the scopes of the hierarchical configuration
+        config_format (str or None): format of the configuration files
+        schema (dict or None): configuration parameters for schema
+
+    Raises:
+        ValueError: if ``cfg`` scopes do not match ``scopes``
+    """
+    # Retrieve default values
+    settings = _retrieve_settings(scopes, config_format, schema)
+
+    # Construct the filename of the configuration
+    config_filename = config_name + '.' + settings.format
+
+    # Retrieve the writer
+    writer = json
+
+    # Check that the configuration object is valid and consistent with settings
+    _valdate_cfg_consistency(cfg, settings)
+
+    # Dump the scopes to file
+    scopes_d = dict(settings.scopes)
+    for scope_name, obj in cfg.mappings.items():
+        # If the object is empty, then continue to dump the hierarchy
+        if not obj:
+            continue
+
+        directory = scopes_d[scope_name]
+        current = os.path.join(directory, config_filename)
+        with open(current, 'w') as partial_cfg:
+            writer.dump(obj, partial_cfg)
+
+
+def _retrieve_settings(scopes, config_format, schema):
+    """Retrieves the settings to be used when dumping or loading a
+    hierarchical configuration.
+
+    Returns:
+        ConfigSettings: object containing the current settings
+    """
+    settings = ConfigSettings()
+    settings['scopes'] = scopes or DEFAULTS['scopes']
+    settings['format'] = config_format or DEFAULTS['format']
+    # TODO: still to be implemented
+    settings['schema'] = schema or DEFAULTS['schema']
+    return settings
+
+
+def _valdate_cfg_consistency(cfg, settings):
+    """Checks that ``cfg`` can be dumped and is consistent with settings.
+
+    Args:
+        cfg: configuration object
+        settings: settings of the hierarchical configuration
+
+    Raises:
+        ValueError: if any inconsistency is found between ``cfg`` and
+            ``settings``
+    """
+    # Check that we don't have modifications in scratch still to be merged
+    if cfg.mappings['_scratch_']:
+        msg = 'cannot dupm an object with mdifications in scratch'
+        raise ValueError(msg)
+    # Check that the current object matches the scope that will be used
+    scopes_in_object = [x for x, _ in cfg.mappings.items() if x != '_scratch_']
+    scopes_in_settings = [x for x, _ in settings.scopes]
+    if scopes_in_object != scopes_in_settings:
+        msg = 'scopes in the object do not match with scopes in settings'
+        raise ValueError(msg)

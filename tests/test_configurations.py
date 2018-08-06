@@ -117,6 +117,13 @@ class TestBasicAPI(object):
         with pytest.raises(ValueError):
             ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
 
+        # Check that instead flattening the hierarchy works
+        cfg = cfg.flattened()
+        ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+        cfg_dumped = ubimaior.configurations.load('config_nc', scopes=tmp_scopes)
+
+        assert cfg == cfg_dumped
+
         # Check that scopes ust match when dumping
         tmp_scopes[2:] = []
         with pytest.raises(ValueError):

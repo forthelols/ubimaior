@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Ubimaior is a package to manage hierarchical configurations"""
 
+import copy
 import itertools
 
 import six
@@ -378,3 +379,102 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
     def _get_merged_keys(self):
         keys = super(OverridableMapping, self)._get_merged_keys()
         return [key for key in keys if not key.endswith(':')]
+
+    def flattened(self, target=None):
+        """Flattens the scopes up to target.
+
+        Args:
+            target (str or None): scope on to which we should flatten. If None
+                only the ``_scratch_`` scope will be flattened onto the highest
+                scope available.
+
+        Returns:
+            Maps with the scopes flattened up to target
+
+        Raises:
+            TypeError: if target is of the wrong type
+            ValueError: if target is not among the allowed values
+        """
+
+        target = target or next(itertools.dropwhile(lambda x: x == self.scratch_key, self.mappings))
+
+        # Check target type
+        if not isinstance(target, six.string_types):
+            raise TypeError('"target" must be of string type')
+
+        # Check if the target is in the scope list
+        if target not in self.mappings:
+            msg = '"target" must be a valid scope [Accepted values: {0}]'
+            raise ValueError(msg.format(', '.join(
+                x for x in self.mappings if x != self.scratch_key
+            )))
+
+        # Copy the current object into a temporary one that will be modified
+        flattened = type(self)(
+            [(key, value) for key, value in copy.deepcopy(self.mappings).items()]
+        )
+        scopes = list(flattened.mappings)
+        for scope, next_scope in zip(scopes[:-1], scopes[1:]):
+            # Break if the mapping is flattened onto target
+            if scope == target:
+                break
+
+            # Merge the current map onto the next in scope
+            current_map = flattened.mappings[scope]
+            next_map = flattened.mappings[next_scope]
+            self._merge_maps(current_map, next_map)
+
+            # Discard the current scope or nullify scratch
+            if scope == self.scratch_key:
+                flattened.mappings[self.scratch_key] = {}
+            else:
+                del flattened.mappings[scope]
+
+        return flattened
+
+    @staticmethod
+    def _merge_maps(current_map, next_map):
+        """Merges the current map onto the next map. Modifies ``next_map``.
+
+        Args:
+            current_map: map of the current scope
+            next_map: map of the next scope (lower in priority)
+        """
+        for key, value in current_map.items():
+
+            is_override = key.endswith(':')
+            normal_key, override_key = key.rstrip(':'), key.rstrip(':') + ':'
+
+            # 1. If the key overrides what's below, report it as an override key
+            # and pop the normal key if it was there
+            if is_override:
+                next_map[override_key] = current_map[override_key]
+                # In case pop a normal key if it was there
+                next_map.pop(normal_key, None)
+
+            # 2. If the key is a normal key and both the normal key and the override key are
+            # not not present in the next scope, then just push the normal key down one scope
+            elif all(k not in next_map for k in (normal_key, override_key)):
+                next_map[normal_key] = current_map[normal_key]
+
+            # 3. If the key is present in the next scope the logic is more complicated.
+            # In that case:
+            #   a.) We need to use the key of next scope to preserve overriding rules
+            #   b.) We need to merge Sequences and Mapping accordingly
+            else:
+                key_type = override_key if override_key in next_map else normal_key
+
+                if isinstance(value, MutableMapping):
+                    # Here we recurse on the two mappings
+                    flattened_map = OverridableMapping([
+                        ('first', current_map[normal_key]), ('second', next_map[key_type])
+                    ])
+                    flattened_map = flattened_map.flattened(target='second')
+                    flattened_map = dict(flattened_map.second.items())
+                    next_map[key_type] = flattened_map
+
+                elif isinstance(value, MutableSequence):
+                    next_map[key_type] = current_map[normal_key] + next_map[key_type]
+
+                else:
+                    next_map[key_type] = value

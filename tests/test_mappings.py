@@ -378,3 +378,60 @@ class TestOverridableMapping(object):
             overridable_d['foo:'] = None
         msg = str(excinfo.value)
         assert 'a key cannot end with a' in msg
+
+    def test_flattening_errors(self, overridable_l):
+
+        # Check that type errors are raise correctly
+        with pytest.raises(TypeError):
+            overridable_l.flattened(1)
+
+        # Check that value errors are raised correctly
+        with pytest.raises(ValueError):
+            overridable_l.flattened(target='doesnotexist')
+
+    def test_flattening_lists(self, overridable_l):
+
+        # Write a scalar type into the map
+        overridable_l['fee'] = 1
+        assert overridable_l.scratch['fee:'] == 1
+
+        # Flatten scratch onto the highest layer
+        flattened = overridable_l.flattened()
+        assert len(flattened.scratch) == 0
+        assert flattened['fee'] == 1
+        assert flattened.highest['fee:'] == 1
+
+        # Flatten everything onto middle
+        flattened = overridable_l.flattened(target='middle')
+        assert len(flattened.scratch) == 0
+        assert flattened['fee'] == 1
+        assert 'highest' not in flattened.mappings
+        assert list(flattened['foo']) == [11, 22, 'a', 'b']
+
+        for key in ('foo:', 'baz', 'foobar', 'bar', 'fee:'):
+            assert key in flattened.middle
+
+    def test_flattening_dictionaries(self, overridable_d):
+        # Check flattening a dictionary without writing to scratch
+        flattened = overridable_d.flattened(target='middle')
+        assert len(flattened.mappings) == 3
+        assert flattened.middle == {'foo:': {'a': 1, 'b': {'xx': 1}, 'c': 2}}
+        assert flattened == overridable_d
+
+        # Write something to scratch and check again the flattening
+        overridable_d['foo']['b']['yy'] = 2
+        overridable_d['bar'] = {'a': 1, 'b': 2}
+        flattened = overridable_d.flattened(target='middle')
+        assert len(flattened.mappings) == 3
+        assert flattened.middle == {
+            'foo:': {'a': 1, 'b': {'xx': 1, 'yy:': 2}, 'c': 2},
+            'bar:': {'a': 1, 'b': 2}
+        }
+        assert flattened == overridable_d
+
+        # Check that also non-container types are handled correctly
+        overridable_d.mappings['highest']['babau'] = 1
+        overridable_d.mappings['middle']['babau'] = 2
+        flattened = overridable_d.flattened(target='middle')
+        assert flattened['babau'] == 1
+        assert 'babau' in flattened.middle

@@ -50,6 +50,10 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
     ],
+    extras_require={
+        'YAML': 'PyYAML',
+        'TOML': 'toml'
+    },
     test_suite='tests',
     tests_require=test_requirements,
     setup_requires=setup_requirements,

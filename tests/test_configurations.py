@@ -1,6 +1,7 @@
 import os.path
 import pytest
 
+import ubimaior
 import ubimaior.configurations
 
 
@@ -29,22 +30,41 @@ def tmp_scopes(tmpdir):
     ]
 
 
+@pytest.fixture(params=[ubimaior.JSON, ubimaior.YAML, ubimaior.TOML])
+def config_format(request):
+    return request.param
+
+
 class TestBasicAPI(object):
-    def test_loading_configurations(self, mock_scopes):
+    def test_loading_configurations(self, mock_scopes, config_format):
         # Try to call passing all the parameters explicitly
         config_nc = ubimaior.configurations.load(
-            'config_nc', scopes=mock_scopes, config_format='json', schema=False
+            'config_nc', scopes=mock_scopes, config_format=config_format, schema=False
         )
 
         assert config_nc['foo'] == 1
         assert config_nc['bar'] == 'this_is_bar'
         assert config_nc['baz'] is False
+        assert list(config_nc['nested']['a']) == [1, 2, 3, 4, 5, 6]
+        assert config_nc['nested']['b'] is True
 
-        assert config_nc.middle == {'foo': 6, 'bar': 'this_is_bar'}
+        assert config_nc.middle == {
+            'foo': 6,
+            'bar': 'this_is_bar'
+        }
+
+        assert config_nc.lowest == {
+            'bar': '4',
+            'baz': False,
+            'nested': {
+                'a': [4, 5, 6],
+                'b': True
+            }
+        }
 
         # Call using default values
         ubimaior.configurations.set_default_scopes(mock_scopes)
-        ubimaior.configurations.set_default_format(ubimaior.JSON)
+        ubimaior.configurations.set_default_format(config_format)
         config_nc_default = ubimaior.configurations.load('config_nc')
 
         assert config_nc == config_nc_default
@@ -65,7 +85,7 @@ class TestBasicAPI(object):
             ubimaior.configurations.set_default_format(1)
 
         with pytest.raises(ValueError):
-            ubimaior.configurations.set_default_format('toml')
+            ubimaior.configurations.set_default_format('not_registered')
 
     def test_default_settings(self):
         # Check that all the keys allowed in the settings are there
@@ -98,10 +118,10 @@ class TestBasicAPI(object):
         with pytest.raises(AttributeError):
             default.does_not_exist
 
-    def test_dumping_configurations(self, mock_scopes, tmp_scopes):
+    def test_dumping_configurations(self, mock_scopes, config_format, tmp_scopes):
         # Load the test configurations
         ubimaior.configurations.set_default_scopes(mock_scopes)
-        ubimaior.configurations.set_default_format(ubimaior.JSON)
+        ubimaior.configurations.set_default_format(config_format)
         cfg = ubimaior.configurations.load('config_nc')
 
         # Dump them somewhere

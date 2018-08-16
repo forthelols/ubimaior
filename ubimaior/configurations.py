@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """I/O of hierarchical configurations in various formats."""
 
-import json
 import os.path
 
 import six
 
 import ubimaior
+import ubimaior.formats
 import ubimaior.mappings
 
 
@@ -17,11 +17,6 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
     valid_settings = (
         'scopes', 'format', 'schema'
     )
-
-    #: Formats that are currently allowed
-    allowed_formats = [
-        ubimaior.JSON
-    ]
 
     def __init__(self):
         self._settings = {'scopes': None, 'format': None, 'schema': None}
@@ -45,7 +40,8 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
     def __len__(self):
         return len(self._settings)
 
-    def _validate_value(self, key, value):
+    @staticmethod
+    def _validate_value(key, value):
         """Validate the arguments written as defaults.
 
         Args:
@@ -67,9 +63,9 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
                 msg = '"format" must be a valid string'
                 raise TypeError(msg)
 
-            if value not in self.allowed_formats:
+            if value not in ubimaior.formats.FORMATTERS:
                 msg = 'unknown format type. Allowed values are {0}'
-                raise ValueError(msg.format(', '.join(self.allowed_formats)))
+                raise ValueError(msg.format(', '.join(ubimaior.formats.FORMATTERS)))
 
     def _validate_key(self, key):
         if key not in self.valid_settings:
@@ -140,8 +136,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
     config_filename = config_name + '.' + settings.format
 
     # Retrieve the reader of the files
-    # TODO: generalize how the reader is fetched
-    reader = json
+    formatter = ubimaior.formats.FORMATTERS[settings.format]
 
     mappings = []
     for scope_name, directory in settings.scopes:
@@ -154,7 +149,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
 
         # If so load the content and append it to the hierarchy
         with open(current) as partial_cfg:
-            mappings.append((scope_name, reader.load(partial_cfg)))
+            mappings.append((scope_name, formatter.load(partial_cfg)))
 
     return ubimaior.mappings.OverridableMapping(mappings)
 
@@ -184,7 +179,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
     config_filename = config_name + '.' + settings.format
 
     # Retrieve the writer
-    writer = json
+    formatter = ubimaior.formats.FORMATTERS[settings.format]
 
     # Check that the configuration object is valid and consistent with settings
     _valdate_cfg_consistency(cfg, settings)
@@ -199,7 +194,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
         directory = scopes_d[scope_name]
         current = os.path.join(directory, config_filename)
         with open(current, 'w') as partial_cfg:
-            writer.dump(obj, partial_cfg)
+            formatter.dump(obj, partial_cfg)
 
 
 def _retrieve_settings(scopes, config_format, schema):

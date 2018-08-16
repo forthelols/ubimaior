@@ -223,9 +223,19 @@ def _valdate_cfg_consistency(cfg, settings):
         ValueError: if any inconsistency is found between ``cfg`` and
             ``settings``
     """
+    def is_empty(item):
+        # If it is not a dictionary cast to bool
+        if not isinstance(item, ubimaior.mappings.MutableMapping):
+            return not bool(item)
+
+        # If it is a dictionary recurse
+        if not item:
+            return True
+        return all(is_empty(v) for v in item.values())
+
     # Check that we don't have modifications in scratch still to be merged
-    if cfg.mappings['_scratch_']:
-        msg = 'cannot dupm an object with mdifications in scratch'
+    if not is_empty(cfg.mappings['_scratch_']):
+        msg = 'cannot dump an object with modifications in scratch'
         raise ValueError(msg)
     # Check that the current object matches the scope that will be used
     scopes_in_object = [x for x, _ in cfg.mappings.items() if x != '_scratch_']

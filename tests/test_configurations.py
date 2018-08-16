@@ -134,8 +134,9 @@ class TestBasicAPI(object):
 
         # Check that I can't have modifications in scratch when dumping
         cfg['foobar'] = [1, 2, 3]
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as excinfo:
             ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+        assert 'cannot dump an object with modifications in scratch' in str(excinfo.value)
 
         # Check that instead flattening the hierarchy works
         cfg = cfg.flattened()
@@ -144,7 +145,8 @@ class TestBasicAPI(object):
 
         assert cfg == cfg_dumped
 
-        # Check that scopes ust match when dumping
+        # Check that scopes must match when dumping
         tmp_scopes[2:] = []
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as excinfo:
             ubimaior.configurations.dump(cfg_dumped, 'config_nc', scopes=tmp_scopes)
+        assert 'scopes in the object do not match' in str(excinfo.value)

@@ -3,6 +3,7 @@
 
 import os.path
 
+import jsonschema
 import six
 
 import ubimaior
@@ -112,6 +113,62 @@ def set_default_format(fmt):
     DEFAULTS['format'] = fmt
 
 
+def validate(cfg_object, schema):
+    """Validates a configuration object against a schema.
+
+    Args:
+        cfg_object: configuration object to be validated
+        schema (dict or path): either a schema object already in
+            memory or a path where to read one. If it is a file
+            all the registered formats are accepted (JSON, YAML, etc.)
+
+    Raises:
+        jsonschema.ValidationError: if the configuration object doesn't conform
+            to the schema
+        jsonschema.SchemaError: if the schema does not conform to the jsonschema
+            specifications
+        ValueError: if ``schema`` is a file and either the file does not exist or
+            its format is not recognized
+    """
+    # If schema is a string, assume it's a file containing the schema
+    if isinstance(schema, six.string_types):
+        # If it is not a valid file raise an appropriate error
+        if not os.path.isfile(schema):
+            msg = '"{0}" does not exist or is not a file'
+            # TODO: in python > 3 a FileNotFoundError would be more appropriate
+            raise ValueError(msg.format(schema))
+
+        schema_format = os.path.splitext(schema)[1].lstrip('.')
+
+        # If the format of the file is not recognized, raise an error too
+        if schema_format not in ubimaior.formats.FORMATTERS:
+            msg = '"{0}" is not a valid format [Allowed formats are: {1}]'
+            msg = msg.format(
+                schema_format,
+                ', '.join(list(ubimaior.formats.FORMATTERS))
+            )
+            raise ValueError(msg)
+
+        schema_formatter = ubimaior.formats.FORMATTERS[schema_format]
+        schema_file = schema
+        with open(schema_file) as schema_f:
+            schema = schema_formatter.load(schema_f)
+
+    flattened_obj = cfg_object.as_dict()
+    jsonschema.validate(flattened_obj, schema)
+
+
+def _is_empty(item):
+    # If it is not a dictionary cast to bool
+    if not isinstance(item, ubimaior.mappings.MutableMapping):
+        return not bool(item)
+
+    # If it is a dictionary recurse
+    if not item:
+        return True
+    return all(_is_empty(v) for v in item.values())
+
+
 def load(config_name, scopes=None, config_format=None, schema=None):
     """Loads a hierarchical configuration into an object.
 
@@ -151,7 +208,13 @@ def load(config_name, scopes=None, config_format=None, schema=None):
         with open(current) as partial_cfg:
             mappings.append((scope_name, formatter.load(partial_cfg)))
 
-    return ubimaior.mappings.OverridableMapping(mappings)
+    obj = ubimaior.mappings.OverridableMapping(mappings)
+
+    # Validate the object against the supplied schema
+    if schema:
+        validate(obj, schema)
+
+    return obj
 
 
 def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
@@ -184,11 +247,15 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
     # Check that the configuration object is valid and consistent with settings
     _valdate_cfg_consistency(cfg, settings)
 
+    # Validate the object against the supplied schema
+    if schema:
+        validate(cfg, schema)
+
     # Dump the scopes to file
     scopes_d = dict(settings.scopes)
     for scope_name, obj in cfg.mappings.items():
         # If the object is empty, then continue to dump the hierarchy
-        if not obj:
+        if _is_empty(obj):
             continue
 
         directory = scopes_d[scope_name]
@@ -223,18 +290,8 @@ def _valdate_cfg_consistency(cfg, settings):
         ValueError: if any inconsistency is found between ``cfg`` and
             ``settings``
     """
-    def is_empty(item):
-        # If it is not a dictionary cast to bool
-        if not isinstance(item, ubimaior.mappings.MutableMapping):
-            return not bool(item)
-
-        # If it is a dictionary recurse
-        if not item:
-            return True
-        return all(is_empty(v) for v in item.values())
-
     # Check that we don't have modifications in scratch still to be merged
-    if not is_empty(cfg.mappings['_scratch_']):
+    if not _is_empty(cfg.mappings['_scratch_']):
         msg = 'cannot dump an object with modifications in scratch'
         raise ValueError(msg)
     # Check that the current object matches the scope that will be used

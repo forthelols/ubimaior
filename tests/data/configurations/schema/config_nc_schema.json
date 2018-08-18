@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "foo": {
+      "description": "A foo",
+      "type": "integer"
+    },
+    "bar": {
+      "description": "A bar",
+      "type": "string"
+    },
+    "nested": {
+      "description": "A nested dictionary",
+      "type": "object",
+      "properties": {
+        "a": {
+          "description": "A list of integers",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "baz": {
+      "type": "boolean"
+    }
+  }
+}

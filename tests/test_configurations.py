@@ -35,11 +35,31 @@ def config_format(request):
     return request.param
 
 
+@pytest.fixture(params=[
+    None,  # No schema validation
+    {
+        'type': 'object'
+    },  # Validate from an object in memory
+    os.path.join(
+        os.path.dirname(__file__), 'data', 'configurations', 'schema', 'config_nc_schema.json'
+    )  # Validate from a schema stored in a file
+])
+def schema(request):
+    return request.param
+
+
+@pytest.fixture()
+def schema_with_wrong_format(tmpdir):
+    p = tmpdir.join('schema.txt')
+    p.write('foo')
+    return str(p)
+
+
 class TestBasicAPI(object):
-    def test_loading_configurations(self, mock_scopes, config_format):
+    def test_loading_configurations(self, mock_scopes, config_format, schema):
         # Try to call passing all the parameters explicitly
         config_nc = ubimaior.configurations.load(
-            'config_nc', scopes=mock_scopes, config_format=config_format, schema=False
+            'config_nc', scopes=mock_scopes, config_format=config_format, schema=schema
         )
 
         assert config_nc['foo'] == 1
@@ -118,17 +138,17 @@ class TestBasicAPI(object):
         with pytest.raises(AttributeError):
             default.does_not_exist
 
-    def test_dumping_configurations(self, mock_scopes, config_format, tmp_scopes):
+    def test_dumping_configurations(self, mock_scopes, config_format, tmp_scopes, schema):
         # Load the test configurations
         ubimaior.configurations.set_default_scopes(mock_scopes)
         ubimaior.configurations.set_default_format(config_format)
         cfg = ubimaior.configurations.load('config_nc')
 
         # Dump them somewhere
-        ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+        ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes, schema=schema)
 
         # Reload and check
-        cfg_dumped = ubimaior.configurations.load('config_nc', scopes=tmp_scopes)
+        cfg_dumped = ubimaior.configurations.load('config_nc', scopes=tmp_scopes, schema=schema)
 
         assert cfg == cfg_dumped
 
@@ -150,3 +170,14 @@ class TestBasicAPI(object):
         with pytest.raises(ValueError) as excinfo:
             ubimaior.configurations.dump(cfg_dumped, 'config_nc', scopes=tmp_scopes)
         assert 'scopes in the object do not match' in str(excinfo.value)
+
+    def test_file_errors_on_validate(self, schema_with_wrong_format):
+        # Passing as argument a schema that does not exist
+        with pytest.raises(ValueError) as excinfo:
+            ubimaior.configurations.validate({}, schema='foo')
+        assert 'does not exist or is not a file' in str(excinfo.value)
+
+        # Passing as argument a schema with the wrong format
+        with pytest.raises(ValueError) as excinfo:
+            ubimaior.configurations.validate({}, schema=schema_with_wrong_format)
+        assert 'is not a valid format [Allowed formats are:' in str(excinfo.value)

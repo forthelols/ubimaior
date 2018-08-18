@@ -7,6 +7,7 @@ six==1.11.0
 tox==3.2.1
 coverage==4.5.1
 Sphinx==1.7.6
+jsonschema==2.6.0
 
 PyYAML==3.13
 toml==0.9.4

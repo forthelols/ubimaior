@@ -478,3 +478,9 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
                 else:
                     next_map[key_type] = value
+
+    def as_dict(self):
+        """Converts this configuration object to built-in types."""
+        lowest = next(reversed(self.mappings))
+        flat_obj = self.flattened(target=lowest)
+        return getattr(flat_obj, lowest)

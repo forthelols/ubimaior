@@ -85,6 +85,76 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
 #: Default settings for the module
 DEFAULTS = ConfigSettings()
 
+#: Schema for the global configuration file
+_UBIMAIOR_CFG_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': True,
+    'properties': {
+        'format': {
+            'description': 'The format used for the configuration file',
+            'enum': [x for x in ubimaior.formats.FORMATTERS]
+        },
+        'scopes': {
+            'description': 'The hierarchical scopes of the configuration as'
+                           ' a list of (name, path) tuples',
+            'type': 'array',
+            'minItems': 1,
+            'uniqueItems': True,
+            'items': {
+                'type': 'array',
+                'minItems': 2,
+                'maxItems': 2,
+                'items': {
+                    'type': 'string'
+                }
+            }
+        },
+        'schema': {
+            'description': 'Path to the schema file used too validate the hierarchy',
+            'type': 'string'
+        }
+    },
+    'required': ['format', 'scopes']
+}
+
+
+def setup_from_file(configuration_file):
+    """Sets ubimaior global defaults from a configuration file.
+
+    Args:
+        configuration_file (str): path to the configuration file
+    """
+    # Check if the configuration file exists
+    if not os.path.exists(configuration_file):
+        msg = 'configuration file "{0}" does not exist'
+        raise IOError(msg.format(configuration_file))
+
+    configuration_file = os.path.abspath(configuration_file)
+    configuration_dir = os.path.dirname(configuration_file)
+
+    def make_abs(path):
+        if os.path.isabs(path):
+            return path
+        return os.path.abspath(os.path.join(configuration_dir, path))
+
+    # Retrieve the correct formatter to load the configuration
+    _, fmt = os.path.splitext(configuration_file)
+    formatter = ubimaior.formats.FORMATTERS[fmt.strip('.')]
+
+    # Load the settings and return them
+    with open(configuration_file) as cfg_stream:
+        configuration = formatter.load(cfg_stream)
+        jsonschema.validate(configuration, _UBIMAIOR_CFG_SCHEMA)
+
+    # Ensure that scopes is a list of tuples
+    scopes = [(name, make_abs(d)) for name, d in configuration['scopes']]
+    set_default_scopes(scopes)
+
+    set_default_format(configuration['format'])
+
+    if 'schema' in configuration:
+        set_default_schema(make_abs(configuration['schema']))
+
 
 def set_default_scopes(scopes):
     """Sets the default scopes to look for configurations.
@@ -111,6 +181,16 @@ def set_default_format(fmt):
             supported ones
     """
     DEFAULTS['format'] = fmt
+
+
+def set_default_schema(schema):
+    """Sets the default schema to validate configuration
+
+    Args:
+        schema (dict): a valid jsonschema schema
+
+    """
+    DEFAULTS['schema'] = schema
 
 
 def validate(cfg_object, schema):
@@ -245,7 +325,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
     formatter = ubimaior.formats.FORMATTERS[settings.format]
 
     # Check that the configuration object is valid and consistent with settings
-    _valdate_cfg_consistency(cfg, settings)
+    _validate_cfg_consistency(cfg, settings)
 
     # Validate the object against the supplied schema
     if schema:
@@ -279,7 +359,7 @@ def _retrieve_settings(scopes, config_format, schema):
     return settings
 
 
-def _valdate_cfg_consistency(cfg, settings):
+def _validate_cfg_consistency(cfg, settings):
     """Checks that ``cfg`` can be dumped and is consistent with settings.
 
     Args:

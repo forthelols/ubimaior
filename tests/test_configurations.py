@@ -6,8 +6,12 @@ import ubimaior.configurations
 
 
 @pytest.fixture()
-def mock_scopes():
-    data_dir = os.path.join(os.path.dirname(__file__), 'data', 'configurations')
+def data_dir():
+    return os.path.join(os.path.dirname(__file__), 'data', 'configurations')
+
+
+@pytest.fixture()
+def mock_scopes(data_dir):
     return [
         ('highest', os.path.join(data_dir, 'highest')),
         ('middle', os.path.join(data_dir, 'middle')),
@@ -181,3 +185,26 @@ class TestBasicAPI(object):
         with pytest.raises(ValueError) as excinfo:
             ubimaior.configurations.validate({}, schema=schema_with_wrong_format)
         assert 'is not a valid format [Allowed formats are:' in str(excinfo.value)
+
+    @pytest.mark.parametrize('configuration_file', [
+        '.ubimaior.json',
+        '.ubimaior.yaml',
+    ])
+    def test_source_configuration_file(self, configuration_file, data_dir, tmp_scopes):
+        # Sourcing a configuration file should properly set configuration values
+        configuration_file = os.path.join(data_dir, configuration_file)
+        ubimaior.configurations.setup_from_file(configuration_file)
+
+        # Load a configuration and dump it somewhere
+        cfg = ubimaior.configurations.load('config_nc')
+        ubimaior.configurations.dump(cfg, 'config_nc', scopes=tmp_scopes)
+
+        # Reload and check
+        cfg_dumped = ubimaior.configurations.load('config_nc', scopes=tmp_scopes)
+        assert cfg == cfg_dumped
+
+    def test_errors_when_sourcing_configuration_file(self, data_dir):
+        # Try to use a non existing file
+        with pytest.raises(IOError) as excinfo:
+            ubimaior.configurations.setup_from_file('doesnotexist')
+        assert 'does not exist' in str(excinfo.value)

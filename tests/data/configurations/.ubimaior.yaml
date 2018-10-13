@@ -1,0 +1,7 @@
+scopes:
+    - ["highest", "./highest"]
+    - ["middle", "./middle"]
+    - ["doesnotexist", "./doesnotexist"]
+    - ["lowest", "./lowest"]
+
+format: yaml

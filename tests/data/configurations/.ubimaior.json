@@ -1,0 +1,10 @@
+{
+  "scopes": [
+    ["highest", "./highest"],
+    ["middle", "./middle"],
+    ["doesnotexist", "/doesnotexist"],
+    ["lowest", "./lowest"]
+  ],
+  "format": "yaml",
+  "schema": "./schema/config_nc_schema.json"
+}

@@ -26,7 +26,7 @@ def _is_tuple_str_mapping(obj):
     Returns: True or False
     """
     return isinstance(obj, tuple) and len(obj) == 2 and \
-        isinstance(obj[0], str) and isinstance(obj[1], MutableMapping)
+        isinstance(obj[0], six.string_types) and isinstance(obj[1], MutableMapping)
 
 
 def _convert_to_type_or_raise(target_type, key, value):

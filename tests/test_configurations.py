@@ -203,3 +203,25 @@ class TestBasicAPI(object):
         with pytest.raises(IOError) as excinfo:
             ubimaior.configurations.setup_from_file('doesnotexist')
         assert 'does not exist' in str(excinfo.value)
+
+
+def test_search_for_files(data_dir, working_dir):
+    # Testing with absolute path and relative path should return the same result
+    abs_search = ubimaior.configurations.search_file_in_path(
+        os.path.join(data_dir, '.ubimaior.json')
+    )
+    with working_dir(data_dir):
+        rel_search = ubimaior.configurations.search_file_in_path('.ubimaior.json')
+
+    assert rel_search == abs_search
+
+    # If the file does not exist, the function should raise an IOError
+    with pytest.raises(IOError) as exc_info:
+        ubimaior.configurations.search_file_in_path('foo.txt')
+    assert 'file not found' in str(exc_info.value)
+
+    with pytest.raises(IOError) as exc_info:
+        ubimaior.configurations.search_file_in_path(
+            os.path.join(data_dir, 'foo.txt')
+        )
+    assert 'file not found' in str(exc_info.value)

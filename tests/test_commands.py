@@ -40,3 +40,12 @@ def test_failures(runner, working_dir, data_dir):
         result = runner.invoke(ubimaior.commands.main, ['show', '--validate', 'config_nc'])
         assert result.exit_code == 1
         assert ' validation schema not found' in result.output
+
+
+def test_validate_configurations(runner, working_dir, data_dir):
+    with working_dir(data_dir):
+        result = runner.invoke(
+            ubimaior.commands.main,
+            ['--configuration=.ubimaior.json', 'show', '--validate', 'config_nc']
+        )
+        assert result.exit_code == 0

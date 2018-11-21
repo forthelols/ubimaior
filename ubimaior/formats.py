@@ -38,6 +38,23 @@ class Dumper(six.with_metaclass(abc.ABCMeta, object)):  # pylint: disable=too-fe
         """
 
 
+# pylint: disable=too-few-public-methods
+class PrettyPrinter(six.with_metaclass(abc.ABCMeta, object)):
+    """Abstract base class for something that could dump an object to a pretty printed string."""
+    @abc.abstractmethod
+    def pprint(self, obj):
+        """Produce a pretty printed string representing a hierarchical configuration and
+        the provenance of each attribute or value.
+
+        Args:
+            obj (hierarchical configuration): object to be processed
+
+        Returns:
+            tuple of 2 elements, where the first is a list of strings (the lines the are to be
+            printed) and a list of scopes encoding the provenance of each line.
+        """
+
+
 def formatter(name, attribute=None):
     """Register a class as a valid formatter.
 
@@ -72,7 +89,7 @@ def formatter(name, attribute=None):
 
 
 @formatter('json', attribute='JSON')
-class JsonFormatter(Dumper, Loader):
+class JsonFormatter(Dumper, Loader, PrettyPrinter):
     """Formatter for JSON"""
     def load(self, stream):
         return json.load(stream)
@@ -80,18 +97,28 @@ class JsonFormatter(Dumper, Loader):
     def dump(self, obj, stream):
         json.dump(obj, stream)
 
+    def pprint(self, obj):
+        cfg_str = json.dumps(obj.as_dict(), indent=2, sort_keys=True)
+        cfg_lines = cfg_str.split('\n')
+        return cfg_lines, ['' for _ in cfg_lines]
+
 
 try:
     import yaml
 
     @formatter('yaml', attribute='YAML')
-    class YamlFormatter(Dumper, Loader):
+    class YamlFormatter(Dumper, Loader, PrettyPrinter):
         """Formatter for YAML"""
         def load(self, stream):
             return yaml.load(stream)
 
         def dump(self, obj, stream):
             yaml.dump(obj, stream)
+
+        def pprint(self, obj):
+            cfg_str = yaml.dump(obj.as_dict(), default_flow_style=False)
+            cfg_lines = cfg_str.split('\n')
+            return cfg_lines, ['' for _ in cfg_lines]
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover
@@ -101,13 +128,18 @@ try:
     import toml
 
     @formatter('toml', attribute='TOML')
-    class TomlFormatter(Dumper, Loader):
+    class TomlFormatter(Dumper, Loader, PrettyPrinter):
         """Formatter for TOML"""
         def load(self, stream):
             return toml.load(stream)
 
         def dump(self, obj, stream):
             toml.dump(obj, stream)
+
+        def pprint(self, obj):
+            cfg_str = toml.dumps(obj.as_dict())
+            cfg_lines = cfg_str.split('\n')
+            return cfg_lines, ['' for _ in cfg_lines]
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover

@@ -6,11 +6,6 @@ import ubimaior.configurations
 
 
 @pytest.fixture()
-def data_dir():
-    return os.path.join(os.path.dirname(__file__), 'data', 'configurations')
-
-
-@pytest.fixture()
 def mock_scopes(data_dir):
     return [
         ('highest', os.path.join(data_dir, 'highest')),

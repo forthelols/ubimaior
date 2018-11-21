@@ -8,6 +8,7 @@ tox==3.5.2
 coverage==4.5.1
 Sphinx==1.7.6
 jsonschema==2.6.0
+click==7.0
 
 PyYAML==3.13
 toml==0.10.0

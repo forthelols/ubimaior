@@ -110,7 +110,7 @@ _UBIMAIOR_CFG_SCHEMA = {
             }
         },
         'schema': {
-            'description': 'Path to the schema file used too validate the hierarchy',
+            'description': 'Path to the schema file used to validate the hierarchy',
             'type': 'string'
         }
     },
@@ -154,6 +154,40 @@ def setup_from_file(configuration_file):
 
     if 'schema' in configuration:
         set_default_schema(make_abs(configuration['schema']))
+
+
+def search_file_in_path(filename, start_dir=None):
+    """Searches for a file starting from the directory passed as argument and proceeding
+    up to parent directories, until root. Raises if the file is not found.
+
+    Args:
+        filename (str): name of the file to look for
+        start_dir (path): directory where to start looking for the file
+
+    Returns:
+        Absolute path to the file
+
+    Raises:
+        IOError: if the file is not found.
+    """
+    # If the file is given with an absolute path just check it exists (or raise)
+    if os.path.isabs(filename):
+        if os.path.exists(filename) and os.path.isfile(filename):
+            return filename
+        raise IOError('file not found [{0}]'.format(filename))
+
+    # Otherwise search in start_dir and proceed up to parent until root is reached
+    start_dir = start_dir or os.getcwd()
+    start_dir = os.path.realpath(os.path.abspath(start_dir))
+
+    while True:
+        abs_filename = os.path.join(start_dir, filename)
+        if os.path.exists(abs_filename) and os.path.isfile(abs_filename):
+            return abs_filename
+
+        start_dir, is_root = os.path.dirname(start_dir), os.path.dirname(start_dir) == start_dir
+        if is_root:
+            raise IOError('file not found [{0}]'.format(filename))
 
 
 def set_default_scopes(scopes):
@@ -267,7 +301,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
     """
 
     # Retrieve default values
-    settings = _retrieve_settings(scopes, config_format, schema)
+    settings = retrieve_settings(scopes, config_format, schema)
 
     # Construct the filename of the configuration
     config_filename = config_name + '.' + settings.format
@@ -316,7 +350,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
         ValueError: if ``cfg`` scopes do not match ``scopes``
     """
     # Retrieve default values
-    settings = _retrieve_settings(scopes, config_format, schema)
+    settings = retrieve_settings(scopes, config_format, schema)
 
     # Construct the filename of the configuration
     config_filename = config_name + '.' + settings.format
@@ -344,7 +378,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
             formatter.dump(obj, partial_cfg)
 
 
-def _retrieve_settings(scopes, config_format, schema):
+def retrieve_settings(scopes=None, config_format=None, schema=None):
     """Retrieves the settings to be used when dumping or loading a
     hierarchical configuration.
 

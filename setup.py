@@ -13,7 +13,8 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     'six',
-    'jsonschema'
+    'jsonschema',
+    'Click'
 ]
 
 setup_requirements = [
@@ -55,6 +56,10 @@ setup(
         'YAML': 'PyYAML',
         'TOML': 'toml'
     },
+    entry_points="""
+        [console_scripts]
+        ubimaior=ubimaior.commands:main
+    """,
     test_suite='tests',
     tests_require=test_requirements,
     setup_requires=setup_requirements,

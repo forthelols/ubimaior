@@ -6,7 +6,6 @@ import os.path
 import jsonschema
 import six
 
-import ubimaior
 import ubimaior.formats
 import ubimaior.mappings
 

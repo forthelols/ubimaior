@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """Command line tools to view, query and manipulate hierarchical  configurations."""
+import collections
+import itertools
+
 import click
 
 import ubimaior
 import ubimaior.configurations
 import ubimaior.formats
+
 
 # TODO: Add options to override 'schema' and 'scopes'
 
@@ -43,8 +47,12 @@ def main(ctx, configuration, fmt):
     '--validate', type=click.BOOL, default=False, show_default=True, is_flag=True,
     help='Validates the configuration against its schema.'
 )
+@click.option(
+    '--blame', type=click.BOOL, default=False, show_default=True, is_flag=True,
+    help='Show provenance of each attribute or value in the configuration.'
+)
 @click.argument('name')
-def show(validate, name):
+def show(validate, blame, name):
     """Display the merged configuration files."""
     cfg = ubimaior.load(name)
     settings = ubimaior.configurations.retrieve_settings()
@@ -55,5 +63,44 @@ def show(validate, name):
         ubimaior.configurations.validate(cfg, schema)
 
     formatter = ubimaior.formats.FORMATTERS[settings.format]
-    cfg_lines, _ = formatter.pprint(cfg)
-    click.echo_via_pager('\n'.join(cfg_lines))
+    styles = collections.defaultdict(lambda: lambda x: click.style(x, bold=True))
+    styles[ubimaior.formats.TokenTypes.ATTRIBUTE] = lambda x: click.style(x, fg='yellow', bold=True)
+
+    cfg_lines, provenance = formatter.pprint(cfg, formatters=styles)
+
+    if blame:
+        scopes = format_provenance(provenance)
+        formatted_cfg_str = [p + line for p, line in zip(scopes, cfg_lines)]
+        formatted_cfg_str = '\n'.join(formatted_cfg_str)
+    else:
+        formatted_cfg_str = '\n'.join(x for x in cfg_lines)
+
+    click.echo_via_pager(formatted_cfg_str)
+
+
+def format_provenance(provenance):
+    """Format the provenance in a form that is ready to be displayed.
+
+    Args:
+        provenance (list): list of scopes
+
+    Returns:
+        list of formatted string (one for each provenance item)
+    """
+    # Construct a color map for the scopes
+    colors = ['red', 'green', 'blue', 'magenta', 'cyan', 'white', 'black']
+    items = sorted(set(itertools.chain.from_iterable(provenance)))
+    color_map = dict(zip(items, colors))
+
+    # Style all the scopes according to the colormap
+    scopes = [
+        click.style('[[', bold=True) +
+        ','.join(click.style(x, fg=color_map[x]) for x in scope) +
+        click.style(']]', bold=True) + '    '
+        for scope in provenance
+    ]
+
+    raw_lengths = [len(','.join(x)) for x in provenance]
+    max_width = max(raw_lengths)
+    spaces_to_add = [max_width - x for x in raw_lengths]
+    return [val + ' '*spacer for val, spacer in zip(scopes, spaces_to_add)]

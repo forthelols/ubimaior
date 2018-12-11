@@ -9,7 +9,7 @@ coverage==4.5.2
 Sphinx==1.7.6
 jsonschema==2.6.0
 click==7.0
-
+enum34==1.1.6; python_version < '3.4'
 PyYAML==3.13
 toml==0.10.0
 

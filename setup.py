@@ -14,7 +14,8 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'six',
     'jsonschema',
-    'Click'
+    'Click',
+    'enum34 ; python_version<"3.4"',
 ]
 
 setup_requirements = [

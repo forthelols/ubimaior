@@ -304,36 +304,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             raise ValueError(msg)
 
     def __getitem__(self, key):
-        # Ensure that the key is of the correct type,
-        # and does not end with ':'
-        self._check_key_or_raise(key)
-
-        # Check that we don't have more than one key once we applied the
-        # overriding rules
-        scope2keys = [  # (scope, [list of matching keys])
-            (scope, [k for k in d if key == str(k).rstrip(':')])
-            for (scope, d) in self.mappings.items()
-        ]
-
-        # TODO: check for len(keys) > 1 and raise if necessary
-
-        values = []
-        current_key = None
-        for scope, keys in scope2keys:
-            # No key in this scope, continue to the next
-            if not keys:
-                continue
-
-            # Append (scope, key) and break if this key
-            # was an overriding one
-            current_key = keys[0]
-            values.append((scope, self.mappings[scope][current_key]))
-            if current_key.endswith(':'):
-                break
-
-        # Mimic built-in if the key does not exist
-        if not values:
-            raise KeyError(key)
+        current_key, values = self._get_key_components(key)
 
         first_scope, first_value = values[0]
 
@@ -354,6 +325,35 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             return sequences.MergedSequence([value for _, value in values])
 
         return first_value
+
+    def _get_key_components(self, key):
+        # Ensure that the key is of the correct type,
+        # and does not end with ':'
+        self._check_key_or_raise(key)
+        # Check that we don't have more than one key once we applied the
+        # overriding rules
+        scope2keys = [  # (scope, [list of matching keys])
+            (scope, [k for k in d if key == str(k).rstrip(':')])
+            for (scope, d) in self.mappings.items()
+        ]
+        # TODO: check for len(keys) > 1 and raise if necessary
+        values = []
+        current_key = None
+        for scope, keys in scope2keys:
+            # No key in this scope, continue to the next
+            if not keys:
+                continue
+
+            # Append (scope, key) and break if this key
+            # was an overriding one
+            current_key = keys[0]
+            values.append((scope, self.mappings[scope][current_key]))
+            if current_key.endswith(':'):
+                break
+        # Mimic built-in if the key does not exist
+        if not values:
+            raise KeyError(key)
+        return current_key, values
 
     def __setitem__(self, key, value):
         # Ensure that the key is of the correct type,
@@ -484,3 +484,23 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         lowest = next(reversed(self.mappings))
         flat_obj = self.flattened(target=lowest)
         return getattr(flat_obj, lowest)
+
+    def get_scopes(self, key):
+        """Returns the scopes that participate in the construction of the merged attribute,
+        or None.
+
+        Args:
+            key (str): the attribute for which we want to know the component scopes
+
+        Returns:
+            list of scopes or None
+        """
+        _, values = self._get_key_components(key)
+
+        if values:
+            first_scope, first_value = values[0]
+            if not isinstance(first_value, (MutableMapping, MutableSequence)):
+                return [first_scope]
+            return [s for s, v in values if v]
+
+        return None

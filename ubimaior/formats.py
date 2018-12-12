@@ -337,7 +337,7 @@ try:
             elif token.obj_type == TokenTypes.LIST_ITEM:
                 line = indent_block*token.indent_lvl + repr(token.line) + \
                        (',' if token.continuation else '')
-            elif token.obj_type == TokenTypes.VALUE:
+            elif token.obj_type == TokenTypes.VALUE:  # pragma: no cover
                 value = str(token.line)
                 if isinstance(token.line, bool):
                     value = value.lower()

@@ -63,8 +63,11 @@ def show(validate, blame, name):
         ubimaior.configurations.validate(cfg, schema)
 
     formatter = ubimaior.formats.FORMATTERS[settings.format]
-    styles = collections.defaultdict(lambda: lambda x: click.style(x, bold=True))
-    styles[ubimaior.formats.TokenTypes.ATTRIBUTE] = lambda x: click.style(x, fg='yellow', bold=True)
+    styles = None
+    if settings.format in {'yaml', 'json'}:
+        styles = collections.defaultdict(lambda: lambda x: click.style(x, bold=True))
+        attribute = ubimaior.formats.TokenTypes.ATTRIBUTE
+        styles[attribute] = lambda x: click.style(x, fg='yellow', bold=True)
 
     cfg_lines, provenance = formatter.pprint(cfg, formatters=styles)
 

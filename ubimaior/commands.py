@@ -96,11 +96,11 @@ def format_provenance(provenance):
     scopes = [
         click.style('[[', bold=True) +
         ','.join(click.style(x, fg=color_map[x]) for x in scope) +
-        click.style(']]', bold=True) + '    '
+        click.style(']]', bold=True) + '  '
         for scope in provenance
     ]
 
     raw_lengths = [len(','.join(x)) for x in provenance]
     max_width = max(raw_lengths)
     spaces_to_add = [max_width - x for x in raw_lengths]
-    return [val + ' '*spacer for val, spacer in zip(scopes, spaces_to_add)]
+    return [val + ' '*spacer + '|' for val, spacer in zip(scopes, spaces_to_add)]

@@ -9,8 +9,8 @@ import json
 # so we are relying on an external substitute for Python 2.7
 try:
     import enum
-except ImportError:
-    import enum34 as enum
+except ImportError:  # pragma: no cover
+    import enum34 as enum  # pragma: no cover
 
 import six
 
@@ -261,10 +261,8 @@ try:
             yaml.dump(obj, stream)
 
         def format_token(self, token, indent_block, format_fn):
-            if token.line is None:
-                return None
+            line = None if token.line is None else format_fn(str(token.line))
 
-            line = format_fn(str(token.line))
             if token.obj_type == TokenTypes.ATTRIBUTE:
                 return indent_block*token.indent_lvl + line + ':'
             if token.obj_type == TokenTypes.LIST_ITEM:
@@ -272,7 +270,7 @@ try:
             if token.obj_type == TokenTypes.VALUE:
                 return indent_block*token.indent_lvl + line
 
-            return None
+            return line
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover

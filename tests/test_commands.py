@@ -10,6 +10,11 @@ def runner():
     return click.testing.CliRunner()
 
 
+@pytest.fixture(params=ubimaior.formats.FORMATTERS)
+def fmt(request):
+    return request.param
+
+
 def test_showing_help(runner, working_dir, data_dir):
     result = runner.invoke(ubimaior.commands.main, ['--help'])
     assert result.exit_code == 0
@@ -20,7 +25,6 @@ def test_showing_help(runner, working_dir, data_dir):
         assert result.exit_code == 0
 
 
-@pytest.mark.parametrize('fmt', ubimaior.formats.FORMATTERS)
 def test_show_all_formats(runner, working_dir, data_dir, fmt):
     with working_dir(data_dir):
         result = runner.invoke(
@@ -47,5 +51,13 @@ def test_validate_configurations(runner, working_dir, data_dir):
         result = runner.invoke(
             ubimaior.commands.main,
             ['--configuration=.ubimaior.json', 'show', '--validate', 'config_nc']
+        )
+        assert result.exit_code == 0
+
+
+def test_show_blame(runner, working_dir, data_dir, fmt):
+    with working_dir(data_dir):
+        result = runner.invoke(
+            ubimaior.commands.main, ['--format={0}'.format(fmt), 'show', '--blame', 'config_nc']
         )
         assert result.exit_code == 0

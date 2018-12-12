@@ -64,8 +64,7 @@ class PrettyPrinter(six.with_metaclass(abc.ABCMeta, object)):
         """
         # Tokenize the object to be printed
         tokens = _tokenize_object(obj)
-        if tokens:
-            tokens[-1] = tokens[-1]._replace(continuation=False)
+        tokens[-1] = tokens[-1]._replace(continuation=False)
 
         # Construct a representation for each token
         formatters = formatters or collections.defaultdict(lambda: lambda x: x)
@@ -339,8 +338,13 @@ try:
                 line = indent_block*token.indent_lvl + repr(token.line) + \
                        (',' if token.continuation else '')
             elif token.obj_type == TokenTypes.VALUE:
+                value = str(token.line)
+                if isinstance(token.line, bool):
+                    value = value.lower()
+                elif isinstance(token.line, six.string_types):
+                    value = '"' + value + '"'
                 key, self._current_attribute = self.current_key, None
-                line = '{0} = {1}'.format(key, token.line)
+                line = '{0} = {1}'.format(key, value)
             return line
 
 except ImportError:  # pragma: no cover

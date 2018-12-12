@@ -61,3 +61,15 @@ def test_show_blame(runner, working_dir, data_dir, fmt):
             ubimaior.commands.main, ['--format={0}'.format(fmt), 'show', '--blame', 'config_nc']
         )
         assert result.exit_code == 0
+
+
+def test_output_is_valid(runner, working_dir, data_dir, fmt, monkeypatch):
+    with working_dir(data_dir):
+        result = runner.invoke(
+            ubimaior.commands.main, ['--format={0}'.format(fmt), 'show', 'config_nc']
+        )
+        decoder = getattr(ubimaior.formats, fmt)
+        obj = decoder.loads(result.output) if fmt != 'yaml' else decoder.load(result.output)
+
+        assert all(key in obj for key in ('foo', 'nested', 'bar', 'baz'))
+        assert obj['nested']['a'] == [1, 2, 3, 4, 5, 6]

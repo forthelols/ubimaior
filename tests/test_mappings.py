@@ -435,3 +435,9 @@ class TestOverridableMapping(object):
         flattened = overridable_d.flattened(target='middle')
         assert flattened['babau'] == 1
         assert 'babau' in flattened.middle
+
+    def test_getting_scopes(self, overridable_d):
+        scopes = overridable_d.get_scopes('foo')
+        assert scopes == ['highest', 'middle']
+
+        assert overridable_d.get_scopes('bar') is None

@@ -495,12 +495,15 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         Returns:
             list of scopes or None
         """
-        _, values = self._get_key_components(key)
+        try:
+            _, values = self._get_key_components(key)
 
-        if values:
-            first_scope, first_value = values[0]
-            if not isinstance(first_value, (MutableMapping, MutableSequence)):
-                return [first_scope]
-            return [s for s, v in values if v]
+            if values:
+                first_scope, first_value = values[0]
+                if not isinstance(first_value, (MutableMapping, MutableSequence)):
+                    return [first_scope]
+                return [s for s, v in values if v]
+        except KeyError:
+            pass
 
         return None

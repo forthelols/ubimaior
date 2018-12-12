@@ -2,7 +2,15 @@
 """Formats that are handled by the package, and utilities to manage them"""
 
 import abc
+import collections
 import json
+
+# The module enum does not exist for Python < 3.4,
+# so we are relying on an external substitute for Python 2.7
+try:
+    import enum
+except ImportError:  # pragma: no cover
+    import enum34 as enum  # pragma: no cover
 
 import six
 
@@ -41,17 +49,46 @@ class Dumper(six.with_metaclass(abc.ABCMeta, object)):  # pylint: disable=too-fe
 # pylint: disable=too-few-public-methods
 class PrettyPrinter(six.with_metaclass(abc.ABCMeta, object)):
     """Abstract base class for something that could dump an object to a pretty printed string."""
-    @abc.abstractmethod
-    def pprint(self, obj):
+    def pprint(self, obj, formatters=None):
         """Produce a pretty printed string representing a hierarchical configuration and
         the provenance of each attribute or value.
 
         Args:
             obj (hierarchical configuration): object to be processed
+            formatters (dict): dictionary mapping token types to a function
+                that will format their value
 
         Returns:
-            tuple of 2 elements, where the first is a list of strings (the lines the are to be
-            printed) and a list of scopes encoding the provenance of each line.
+            tuple of 2 elements, where the first is a list of strings (the lines that are to be
+            printed) while the second is a list of scopes encoding the provenance of each line.
+        """
+        # Tokenize the object to be printed
+        tokens = _tokenize_object(obj)
+        tokens[-1] = tokens[-1]._replace(continuation=False)
+
+        # Construct a representation for each token
+        formatters = formatters or collections.defaultdict(lambda: lambda x: x)
+        indent_block = ' '*2
+        cfg_lines, cfg_scopes = [], []
+        for token in tokens:
+            current = self.format_token(token, indent_block, formatters[token.obj_type])
+            if current:
+                cfg_lines.append(current)
+                cfg_scopes.append(token.scope or [])
+
+        return cfg_lines, cfg_scopes
+
+    @abc.abstractmethod
+    def format_token(self, token, indent_block, format_fn):
+        """Format a token to be pretty printed
+
+        Args:
+            token: token that needs to be formatted
+            indent_block: block used to indent the token
+            format_fn: custom function that accepts a value and transforms it
+
+        Returns:
+            formatted token
         """
 
 
@@ -88,6 +125,82 @@ def formatter(name, attribute=None):
     return _decorator
 
 
+_Token = collections.namedtuple('Token', [
+    'line', 'scope', 'indent_lvl', 'obj_type', 'continuation'
+])
+
+
+class TokenTypes(enum.Enum):
+    """Enumerate the token types used to display merged mappings."""
+    #: Start a dictionary
+    DICTIONARY_START = 0
+    #: An attribute in a dictionary
+    ATTRIBUTE = 1
+    #: End a dictionary
+    DICTIONARY_END = 2
+    # Start a list
+    LIST_START = 3
+    #: An item in a list
+    LIST_ITEM = 4
+    # End a list
+    LIST_END = 5
+    #: A scalar Value
+    VALUE = 6
+
+
+def _tokenize_object(obj, scope=None, indent_lvl=0):
+    tokens = []
+    if isinstance(obj, ubimaior.OverridableMapping):
+        tokens.append(_Token(
+            line=None, scope=scope, indent_lvl=indent_lvl, obj_type=TokenTypes.DICTIONARY_START,
+            continuation=False
+        ))
+        for attribute, value in obj.items():
+            scope = obj.get_scopes(attribute)
+            # scope = [sc for sc, m in obj.mappings.items() if attribute in m]
+            tokens.append(_Token(
+                line=str(attribute), scope=scope, indent_lvl=indent_lvl,
+                obj_type=TokenTypes.ATTRIBUTE, continuation=False
+            ))
+            # Descend on the current value
+            tokens.extend(_tokenize_object(value, scope=scope, indent_lvl=indent_lvl+1))
+
+        # Here we are closing the dictionary, so there's no further object
+        tokens[-1] = tokens[-1]._replace(continuation=False)
+        tokens.append(_Token(
+            line=None, scope=scope, indent_lvl=indent_lvl, obj_type=TokenTypes.DICTIONARY_END,
+            continuation=True
+        ))
+
+    elif isinstance(obj, ubimaior.MergedSequence):
+        assert len(scope) == len(obj.sequences), 'unexpected number of scopes'
+        tokens.append(_Token(
+            line=None, scope=scope, indent_lvl=indent_lvl, obj_type=TokenTypes.LIST_START,
+            continuation=False
+        ))
+        for component_scope, component_list in zip(scope, obj.sequences):
+            for value in component_list:
+                tokens.append(_Token(
+                    line=value, scope=[component_scope], indent_lvl=indent_lvl + 1,
+                    obj_type=TokenTypes.LIST_ITEM, continuation=True
+                ))
+
+        tokens[-1] = tokens[-1]._replace(continuation=False)
+        tokens.append(_Token(
+            line=None, scope=scope, indent_lvl=indent_lvl, obj_type=TokenTypes.LIST_END,
+            continuation=True
+        ))
+
+    else:
+        assert len(scope) == 1, 'expected a single scope for a scalar value'
+        tokens.append(_Token(
+            line=obj, scope=scope, indent_lvl=indent_lvl, obj_type=TokenTypes.VALUE,
+            continuation=True
+        ))
+
+    return tokens
+
+
 @formatter('json', attribute='JSON')
 class JsonFormatter(Dumper, Loader, PrettyPrinter):
     """Formatter for JSON"""
@@ -97,10 +210,41 @@ class JsonFormatter(Dumper, Loader, PrettyPrinter):
     def dump(self, obj, stream):
         json.dump(obj, stream)
 
-    def pprint(self, obj):
-        cfg_str = json.dumps(obj.as_dict(), indent=2, sort_keys=True)
-        cfg_lines = cfg_str.split('\n')
-        return cfg_lines, ['' for _ in cfg_lines]
+    def format_token(self, token, indent_block, format_fn):
+
+        start_or_end_marker = {
+            TokenTypes.DICTIONARY_START,
+            TokenTypes.DICTIONARY_END,
+            TokenTypes.LIST_START,
+            TokenTypes.LIST_END
+        }
+
+        line = '' if token.obj_type in start_or_end_marker else format_fn(json.dumps(token.line))
+
+        if token.obj_type == TokenTypes.DICTIONARY_START:
+            line += token.indent_lvl * indent_block + '{'
+
+        elif token.obj_type == TokenTypes.DICTIONARY_END:
+            line += token.indent_lvl * indent_block + '}'
+
+        elif token.obj_type == TokenTypes.LIST_START:
+            line += token.indent_lvl * indent_block + '['
+
+        elif token.obj_type == TokenTypes.LIST_END:
+            line += token.indent_lvl * indent_block + ']'
+
+        elif token.obj_type == TokenTypes.ATTRIBUTE:
+            line = indent_block * token.indent_lvl + line + ':'
+
+        elif token.obj_type == TokenTypes.LIST_ITEM:
+            line = token.indent_lvl * indent_block + line
+        else:
+            line = indent_block * token.indent_lvl + line
+
+        if token.continuation:
+            line += ','
+
+        return line
 
 
 try:
@@ -115,10 +259,17 @@ try:
         def dump(self, obj, stream):
             yaml.dump(obj, stream)
 
-        def pprint(self, obj):
-            cfg_str = yaml.dump(obj.as_dict(), default_flow_style=False)
-            cfg_lines = cfg_str.split('\n')
-            return cfg_lines, ['' for _ in cfg_lines]
+        def format_token(self, token, indent_block, format_fn):
+            line = None if token.line is None else format_fn(str(token.line))
+
+            if token.obj_type == TokenTypes.ATTRIBUTE:
+                return indent_block*token.indent_lvl + line + ':'
+            if token.obj_type == TokenTypes.LIST_ITEM:
+                return (token.indent_lvl-1)*indent_block + '- ' + line
+            if token.obj_type == TokenTypes.VALUE:
+                return indent_block*token.indent_lvl + line
+
+            return line
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover
@@ -130,16 +281,71 @@ try:
     @formatter('toml', attribute='TOML')
     class TomlFormatter(Dumper, Loader, PrettyPrinter):
         """Formatter for TOML"""
+
+        def __init__(self):
+            #: Keeps track of which attributes need to
+            #: be prepended to a given key = value pair
+            self._token_stack = []
+            #: Whether we started pprinting or not
+            self._pprint_started = False
+            #: Cache for the current attribute
+            self._current_attribute = None
+
         def load(self, stream):
             return toml.load(stream)
 
         def dump(self, obj, stream):
             toml.dump(obj, stream)
 
-        def pprint(self, obj):
-            cfg_str = toml.dumps(obj.as_dict())
-            cfg_lines = cfg_str.split('\n')
-            return cfg_lines, ['' for _ in cfg_lines]
+        @property
+        def current_key(self):
+            """Returns the key that is being analyzed"""
+            return '.'.join([str(x.line) for x in self._token_stack] +
+                            [str(self._current_attribute.line)])
+
+        def format_token(self, token, indent_block, format_fn):
+            # TOML only accept objects as root, The following lines start / finish
+            # a parsing sequence
+            if token.obj_type == TokenTypes.DICTIONARY_START and not self._pprint_started:
+                self._pprint_started = True
+                return None
+            if token.obj_type == TokenTypes.DICTIONARY_END and not self._token_stack:
+                self._pprint_started = False
+                return None
+
+            assert self._pprint_started, 'unexpected event during formatting.'
+
+            # Operations that modify the cached attributes
+            if token.obj_type == TokenTypes.ATTRIBUTE:
+                self._current_attribute = token
+                return None
+            if token.obj_type == TokenTypes.DICTIONARY_START:
+                self._token_stack.append(self._current_attribute)
+                self._current_attribute = None
+                return None
+            if token.obj_type == TokenTypes.DICTIONARY_END:
+                self._current_attribute = self._token_stack.pop()
+                return None
+
+            # Operations that return formatted output
+            line = None
+            if token.obj_type == TokenTypes.LIST_START:
+                key, self._current_attribute = self.current_key, None
+                line = '{0} = ['.format(key)
+            elif token.obj_type == TokenTypes.LIST_END:
+                line = ']'
+            elif token.obj_type == TokenTypes.LIST_ITEM:
+                line = indent_block*token.indent_lvl + repr(token.line) + \
+                       (',' if token.continuation else '')
+            elif token.obj_type == TokenTypes.VALUE:  # pragma: no cover
+                value = str(token.line)
+                if isinstance(token.line, bool):
+                    value = value.lower()
+                elif isinstance(token.line, six.string_types):
+                    value = '"' + value + '"'
+                key, self._current_attribute = self.current_key, None
+                line = '{0} = {1}'.format(key, value)
+            return line
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover

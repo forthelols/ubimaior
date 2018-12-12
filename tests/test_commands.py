@@ -10,6 +10,11 @@ def runner():
     return click.testing.CliRunner()
 
 
+@pytest.fixture(params=ubimaior.formats.FORMATTERS)
+def fmt(request):
+    return request.param
+
+
 def test_showing_help(runner, working_dir, data_dir):
     result = runner.invoke(ubimaior.commands.main, ['--help'])
     assert result.exit_code == 0
@@ -20,7 +25,6 @@ def test_showing_help(runner, working_dir, data_dir):
         assert result.exit_code == 0
 
 
-@pytest.mark.parametrize('fmt', ubimaior.formats.FORMATTERS)
 def test_show_all_formats(runner, working_dir, data_dir, fmt):
     with working_dir(data_dir):
         result = runner.invoke(
@@ -49,3 +53,23 @@ def test_validate_configurations(runner, working_dir, data_dir):
             ['--configuration=.ubimaior.json', 'show', '--validate', 'config_nc']
         )
         assert result.exit_code == 0
+
+
+def test_show_blame(runner, working_dir, data_dir, fmt):
+    with working_dir(data_dir):
+        result = runner.invoke(
+            ubimaior.commands.main, ['--format={0}'.format(fmt), 'show', '--blame', 'config_nc']
+        )
+        assert result.exit_code == 0
+
+
+def test_output_is_valid(runner, working_dir, data_dir, fmt, monkeypatch):
+    with working_dir(data_dir):
+        result = runner.invoke(
+            ubimaior.commands.main, ['--format={0}'.format(fmt), 'show', 'config_nc']
+        )
+        decoder = getattr(ubimaior.formats, fmt)
+        obj = decoder.loads(result.output) if fmt != 'yaml' else decoder.load(result.output)
+
+        assert all(key in obj for key in ('foo', 'nested', 'bar', 'baz'))
+        assert obj['nested']['a'] == [1, 2, 3, 4, 5, 6]

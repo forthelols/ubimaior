@@ -13,6 +13,6 @@ enum34==1.1.6; python_version < '3.4'
 PyYAML==3.13
 toml==0.10.0
 
-pytest==4.0.1
+pytest==4.1.0
 pytest-runner==4.2
 pytest-cov==2.6.1

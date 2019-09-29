@@ -1,4 +1,4 @@
-pip==19.1.1
+setuptools==41.2.0
 bumpversion==0.5.3
 wheel==0.31.1
 watchdog==0.8.3
@@ -9,7 +9,7 @@ coverage==4.5.3
 Sphinx==1.8.3
 jsonschema==3.0.1
 click==7.0
-enum34==1.1.6; python_version < '3.4'
+enum34==1.1.6; python_version == '2.7'
 PyYAML==5.1
 toml==0.10.0
 

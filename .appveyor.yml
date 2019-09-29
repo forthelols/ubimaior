@@ -6,7 +6,7 @@ environment:
     - TOXENV: py37
 
 install:
-  - pip install --upgrade pip
+  - pip install --upgrade --user pip
   - pip install tox
 
 build: false

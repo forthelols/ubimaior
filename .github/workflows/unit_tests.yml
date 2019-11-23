@@ -36,3 +36,10 @@ jobs:
     - name: Run tests with tox
       run: |
         tox
+        coverage xml
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1.0.4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unit-tests,gh-actions,{{ matrix.os }}

@@ -18,8 +18,6 @@ python:
 install:
 -   pip install --upgrade pip
 -   pip install tox-travis
--   pip install codecov
 
 script:
 -   tox
--   codecov --required

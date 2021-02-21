@@ -3,7 +3,7 @@
 import itertools
 
 try:
-    from collections.abc import Sequence, MutableSequence, Iterable
+    from collections.abc import Sequence, MutableSequence, Iterable  # novm
 except ImportError:
     from collections import Sequence, MutableSequence, Iterable
 
@@ -18,7 +18,7 @@ def _raise_if_not_slice_or_integer(item):
         TypeError: when ``not isinstance(item, (slice, int))``
     """
     if not isinstance(item, (slice, int)):
-        msg = 'list indices must be integers or slices, not str'
+        msg = "list indices must be integers or slices, not str"
         raise TypeError(msg)
 
 
@@ -97,7 +97,7 @@ class MergedSequence(Sequence):
                 return counter, idx
             idx -= len(sequence)
 
-        raise IndexError('list index out of range')
+        raise IndexError("list index out of range")
 
     def __eq__(self, other):
         # Following what built-in lists do, compare False to
@@ -147,14 +147,14 @@ class MergedMutableSequence(MutableSequence, MergedSequence):
 
         # Mimic built-in list for this case
         if isinstance(idx, slice) and not isinstance(value, Iterable):
-            raise TypeError('can only assign an iterable')
+            raise TypeError("can only assign an iterable")
 
         # Handle slices
         if isinstance(idx, slice):
             # TODO: extend to slices of stride different from 1
             if isinstance(idx.step, int) and idx.step != 1:
-                msg = 'attempt to use an extended slice with step {0}'
-                msg += ' [Only step == 1 is allowed]'
+                msg = "attempt to use an extended slice with step {0}"
+                msg += " [Only step == 1 is allowed]"
                 raise ValueError(msg.format(idx.step))
 
             slices = self._split_slice(idx)
@@ -183,7 +183,7 @@ class MergedMutableSequence(MutableSequence, MergedSequence):
 
     def insert(self, index, value):
         if not isinstance(index, int):
-            msg = '\'{0}\' object cannot be interpreted as an integer'
+            msg = "'{0}' object cannot be interpreted as an integer"
             raise TypeError(msg.format(type(index).__name__))
 
         try:
@@ -215,6 +215,7 @@ class MergedMutableSequence(MutableSequence, MergedSequence):
         idx = slice(*idx.indices(len(self)))
 
         for sequence in self.sequences:
+
             def next_slice(slc, seq):
                 """Gives the next slice of a merged sequence"""
                 start = max(slc.start - len(seq), 0)
@@ -254,9 +255,8 @@ class MergedMutableSequence(MutableSequence, MergedSequence):
             except IndexError:
                 # All the slices are empty
                 next(
-                    (v for sl, v, x in zip(slices, values, self.sequences)
-                     if sl.start < len(x)),
-                    values[-1]
+                    (v for sl, v, x in zip(slices, values, self.sequences) if sl.start < len(x)),
+                    values[-1],
                 ).extend(value)
 
         return values

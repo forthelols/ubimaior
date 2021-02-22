@@ -2,6 +2,7 @@
 ubimaior
 ========
 
+![Unit tests](https://github.com/forthelols/ubimaior/actions/workflows/unit_tests.yml/badge.svg)
 
 .. .. image:: https://img.shields.io/pypi/v/ubimaior.svg
         :target: https://pypi.python.org/pypi/ubimaior

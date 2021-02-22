@@ -14,12 +14,10 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
     """Manages the settings for hierarchical configurations."""
 
     #: Settings that are currently permitted
-    valid_settings = (
-        'scopes', 'format', 'schema'
-    )
+    valid_settings = ("scopes", "format", "schema")
 
     def __init__(self):
-        self._settings = {'scopes': None, 'format': None, 'schema': None}
+        self._settings = {"scopes": None, "format": None, "schema": None}
 
     def __getitem__(self, key):
         self._validate_key(key)
@@ -49,7 +47,7 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
             value: new value to use for the setting
 
         """
-        if key == 'scopes':
+        if key == "scopes":
             if not isinstance(value, list):
                 msg = '"scopes" must be a list of tuples [current type is {0}]'
                 raise TypeError(msg.format(type(value).__name__))
@@ -58,25 +56,23 @@ class ConfigSettings(ubimaior.mappings.MutableMapping):
                 msg = 'item in "scopes" must be tuples [(scope_name, dir)]'
                 raise TypeError(msg)
 
-        if key == 'format':
+        if key == "format":
             if not isinstance(value, six.string_types):
                 msg = '"format" must be a valid string'
                 raise TypeError(msg)
 
             if value not in ubimaior.formats.FORMATTERS:
-                msg = 'unknown format type. Allowed values are {0}'
-                raise ValueError(msg.format(', '.join(ubimaior.formats.FORMATTERS)))
+                msg = "unknown format type. Allowed values are {0}"
+                raise ValueError(msg.format(", ".join(ubimaior.formats.FORMATTERS)))
 
     def _validate_key(self, key):
         if key not in self.valid_settings:
-            msg = 'allowed settings are {0}'.format(
-                ', '.join(self._settings.keys())
-            )
+            msg = "allowed settings are {0}".format(", ".join(self._settings.keys()))
             raise KeyError(msg)
 
     def __getattr__(self, name):
         if name not in self.valid_settings:
-            msg = '{0} object has no attribute {1}'
+            msg = "{0} object has no attribute {1}"
             raise AttributeError(msg.format(type(self).__name__, name))
         return self._settings[name]
 
@@ -86,34 +82,32 @@ DEFAULTS = ConfigSettings()
 
 #: Schema for the global configuration file
 _UBIMAIOR_CFG_SCHEMA = {
-    'type': 'object',
-    'additionalProperties': True,
-    'properties': {
-        'format': {
-            'description': 'The format used for the configuration file',
-            'enum': [x for x in ubimaior.formats.FORMATTERS]
+    "type": "object",
+    "additionalProperties": True,
+    "properties": {
+        "format": {
+            "description": "The format used for the configuration file",
+            "enum": list(ubimaior.formats.FORMATTERS),
         },
-        'scopes': {
-            'description': 'The hierarchical scopes of the configuration as'
-                           ' a list of (name, path) tuples',
-            'type': 'array',
-            'minItems': 1,
-            'uniqueItems': True,
-            'items': {
-                'type': 'array',
-                'minItems': 2,
-                'maxItems': 2,
-                'items': {
-                    'type': 'string'
-                }
-            }
+        "scopes": {
+            "description": "The hierarchical scopes of the configuration as"
+            " a list of (name, path) tuples",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": True,
+            "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {"type": "string"},
+            },
         },
-        'schema': {
-            'description': 'Path to the schema file used to validate the hierarchy',
-            'type': 'string'
-        }
+        "schema": {
+            "description": "Path to the schema file used to validate the hierarchy",
+            "type": "string",
+        },
     },
-    'required': ['format', 'scopes']
+    "required": ["format", "scopes"],
 }
 
 
@@ -138,7 +132,7 @@ def setup_from_file(configuration_file):
 
     # Retrieve the correct formatter to load the configuration
     _, fmt = os.path.splitext(configuration_file)
-    formatter = ubimaior.formats.FORMATTERS[fmt.strip('.')]
+    formatter = ubimaior.formats.FORMATTERS[fmt.strip(".")]
 
     # Load the settings and return them
     with open(configuration_file) as cfg_stream:
@@ -146,13 +140,13 @@ def setup_from_file(configuration_file):
         jsonschema.validate(configuration, _UBIMAIOR_CFG_SCHEMA)
 
     # Ensure that scopes is a list of tuples
-    scopes = [(name, make_abs(d)) for name, d in configuration['scopes']]
+    scopes = [(name, make_abs(d)) for name, d in configuration["scopes"]]
     set_default_scopes(scopes)
 
-    set_default_format(configuration['format'])
+    set_default_format(configuration["format"])
 
-    if 'schema' in configuration:
-        set_default_schema(make_abs(configuration['schema']))
+    if "schema" in configuration:
+        set_default_schema(make_abs(configuration["schema"]))
 
 
 def search_file_in_path(filename, start_dir=None):
@@ -173,7 +167,7 @@ def search_file_in_path(filename, start_dir=None):
     if os.path.isabs(filename):
         if os.path.exists(filename) and os.path.isfile(filename):
             return filename
-        raise IOError('file not found [{0}]'.format(filename))
+        raise IOError("file not found [{0}]".format(filename))
 
     # Otherwise search in start_dir and proceed up to parent until root is reached
     start_dir = start_dir or os.getcwd()
@@ -184,9 +178,12 @@ def search_file_in_path(filename, start_dir=None):
         if os.path.exists(abs_filename) and os.path.isfile(abs_filename):
             return abs_filename
 
-        start_dir, is_root = os.path.dirname(start_dir), os.path.dirname(start_dir) == start_dir
+        start_dir, is_root = (
+            os.path.dirname(start_dir),
+            os.path.dirname(start_dir) == start_dir,
+        )
         if is_root:
-            raise IOError('file not found [{0}]'.format(filename))
+            raise IOError("file not found [{0}]".format(filename))
 
 
 def set_default_scopes(scopes):
@@ -199,7 +196,7 @@ def set_default_scopes(scopes):
         TypeError: when ``scopes`` is not a list of two elements tuples
 
     """
-    DEFAULTS['scopes'] = scopes
+    DEFAULTS["scopes"] = scopes
 
 
 def set_default_format(fmt):
@@ -213,7 +210,7 @@ def set_default_format(fmt):
         ValueError: if the requested format is not among the
             supported ones
     """
-    DEFAULTS['format'] = fmt
+    DEFAULTS["format"] = fmt
 
 
 def set_default_schema(schema):
@@ -223,7 +220,7 @@ def set_default_schema(schema):
         schema (dict): a valid jsonschema schema
 
     """
-    DEFAULTS['schema'] = schema
+    DEFAULTS["schema"] = schema
 
 
 def validate(cfg_object, schema):
@@ -251,15 +248,12 @@ def validate(cfg_object, schema):
             # TODO: in python > 3 a FileNotFoundError would be more appropriate
             raise ValueError(msg.format(schema))
 
-        schema_format = os.path.splitext(schema)[1].lstrip('.')
+        schema_format = os.path.splitext(schema)[1].lstrip(".")
 
         # If the format of the file is not recognized, raise an error too
         if schema_format not in ubimaior.formats.FORMATTERS:
             msg = '"{0}" is not a valid format [Allowed formats are: {1}]'
-            msg = msg.format(
-                schema_format,
-                ', '.join(list(ubimaior.formats.FORMATTERS))
-            )
+            msg = msg.format(schema_format, ", ".join(list(ubimaior.formats.FORMATTERS)))
             raise ValueError(msg)
 
         schema_formatter = ubimaior.formats.FORMATTERS[schema_format]
@@ -303,7 +297,7 @@ def load(config_name, scopes=None, config_format=None, schema=None):
     settings = retrieve_settings(scopes, config_format, schema)
 
     # Construct the filename of the configuration
-    config_filename = config_name + '.' + settings.format
+    config_filename = config_name + "." + settings.format
 
     # Retrieve the reader of the files
     formatter = ubimaior.formats.FORMATTERS[settings.format]
@@ -352,7 +346,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
     settings = retrieve_settings(scopes, config_format, schema)
 
     # Construct the filename of the configuration
-    config_filename = config_name + '.' + settings.format
+    config_filename = config_name + "." + settings.format
 
     # Retrieve the writer
     formatter = ubimaior.formats.FORMATTERS[settings.format]
@@ -373,7 +367,7 @@ def dump(cfg, config_name, scopes=None, config_format=None, schema=None):
 
         directory = scopes_d[scope_name]
         current = os.path.join(directory, config_filename)
-        with open(current, 'w') as partial_cfg:
+        with open(current, "w") as partial_cfg:
             formatter.dump(obj, partial_cfg)
 
 
@@ -385,10 +379,10 @@ def retrieve_settings(scopes=None, config_format=None, schema=None):
         ConfigSettings: object containing the current settings
     """
     settings = ConfigSettings()
-    settings['scopes'] = scopes or DEFAULTS['scopes']
-    settings['format'] = config_format or DEFAULTS['format']
+    settings["scopes"] = scopes or DEFAULTS["scopes"]
+    settings["format"] = config_format or DEFAULTS["format"]
     # TODO: still to be implemented
-    settings['schema'] = schema or DEFAULTS['schema']
+    settings["schema"] = schema or DEFAULTS["schema"]
     return settings
 
 
@@ -404,12 +398,12 @@ def _validate_cfg_consistency(cfg, settings):
             ``settings``
     """
     # Check that we don't have modifications in scratch still to be merged
-    if not _is_empty(cfg.mappings['_scratch_']):
-        msg = 'cannot dump an object with modifications in scratch'
+    if not _is_empty(cfg.mappings["_scratch_"]):
+        msg = "cannot dump an object with modifications in scratch"
         raise ValueError(msg)
     # Check that the current object matches the scope that will be used
-    scopes_in_object = [x for x, _ in cfg.mappings.items() if x != '_scratch_']
+    scopes_in_object = [x for x, _ in cfg.mappings.items() if x != "_scratch_"]
     scopes_in_settings = [x for x, _ in settings.scopes]
     if scopes_in_object != scopes_in_settings:
-        msg = 'scopes in the object do not match with scopes in settings'
+        msg = "scopes in the object do not match with scopes in settings"
         raise ValueError(msg)

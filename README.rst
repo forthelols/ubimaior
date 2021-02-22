@@ -2,18 +2,10 @@
 ubimaior
 ========
 
+![Unit tests](https://github.com/forthelols/ubimaior/actions/workflows/unit_tests.yml/badge.svg)
 
 .. .. image:: https://img.shields.io/pypi/v/ubimaior.svg
         :target: https://pypi.python.org/pypi/ubimaior
-
-.. image:: https://ci.appveyor.com/api/projects/status/5hn47fnn05kqvubs?svg=true
-        :target: https://ci.appveyor.com/project/alalazo/ubimaior
-
-.. image:: https://img.shields.io/travis/forthelols/ubimaior.svg
-        :target: https://travis-ci.org/forthelols/ubimaior
-
-.. image:: https://codecov.io/gh/forthelols/ubimaior/graph/badge.svg
-        :target: https://codecov.io/gh/forthelols/ubimaior
 
 .. .. image:: https://readthedocs.org/projects/ubimaior/badge/?version=latest
         :target: https://ubimaior.readthedocs.io/en/latest/?badge=latest
@@ -25,21 +17,4 @@ ubimaior
 
 .. FIXME: Add a short description
 
-
-* Free software: GNU General Public License v3
-* Documentation: https://ubimaior.readthedocs.io.
-
-
-Features
---------
-
-* TODO
-
-Credits
----------
-
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
-
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 

@@ -10,7 +10,7 @@ from . import sequences
 
 try:
     import collections
-    from collections.abc import MutableMapping, MutableSequence
+    from collections.abc import MutableMapping, MutableSequence  # novm
 except ImportError:
     import collections
     from collections import MutableMapping, MutableSequence
@@ -25,8 +25,12 @@ def _is_tuple_str_mapping(obj):
 
     Returns: True or False
     """
-    return isinstance(obj, tuple) and len(obj) == 2 and \
-        isinstance(obj[0], six.string_types) and isinstance(obj[1], MutableMapping)
+    return (
+        isinstance(obj, tuple)
+        and len(obj) == 2
+        and isinstance(obj[0], six.string_types)
+        and isinstance(obj[1], MutableMapping)
+    )
 
 
 def _convert_to_type_or_raise(target_type, key, value):
@@ -50,10 +54,8 @@ def _convert_to_type_or_raise(target_type, key, value):
             value = target_type(value)
         except Exception:
             msg = 'cannot assign value of type {0} to key "{1}"'
-            msg += '[{0} is not convertible to {2}]'
-            raise TypeError(msg.format(
-                type(value).__name__, key, target_type.__name__
-            ))
+            msg += "[{0} is not convertible to {2}]"
+            raise TypeError(msg.format(type(value).__name__, key, target_type.__name__))
     return value
 
 
@@ -68,8 +70,7 @@ class _MappingBase(MutableMapping):
 
         # Check that the items in the list have the correct type
         if any(not _is_tuple_str_mapping(x) for x in mappings):
-            msg = 'items in "mappings" should be (str, Mapping)' \
-                  ' tuples of length 2'
+            msg = 'items in "mappings" should be (str, Mapping) tuples of length 2'
             raise TypeError(msg)
 
         # Check that the items in the list have the correct type
@@ -102,9 +103,7 @@ class _MappingBase(MutableMapping):
             seen_keys.add(k)
             return res
 
-        return [
-            k for d in self.mappings.values() for k in d.keys() if not seen(k)
-        ]
+        return [k for d in self.mappings.values() for k in d.keys() if not seen(k)]
 
     def _type_for_key_or_raise(self, key):
         """Returns the type associated with a given key.
@@ -121,13 +120,10 @@ class _MappingBase(MutableMapping):
         """
         # If the key is present in multiple mappings, and holds
         # instances of different types raise a TypeError
-        types_for_mapping = {
-            scope: type(v[key])
-            for scope, v in self.mappings.items() if key in v
-        }
+        types_for_mapping = {scope: type(v[key]) for scope, v in self.mappings.items() if key in v}
         if len(set(types_for_mapping.values())) > 1:
             msg = 'type mismatch for key "{0}".'
-            msg += ' Overridden keys need to be of the same type.'
+            msg += " Overridden keys need to be of the same type."
             raise TypeError(msg.format(key))
 
         if types_for_mapping:
@@ -143,7 +139,7 @@ class _MappingBase(MutableMapping):
 
     def __getattr__(self, item):
         if item not in self.mappings:
-            msg = '{0} object has no attribute {1}'
+            msg = "{0} object has no attribute {1}"
             raise AttributeError(msg.format(type(self).__name__, item))
 
         return self.mappings[item]
@@ -201,14 +197,10 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
         self._type_for_key_or_raise(key)
 
-        values = [
-            v[key] for v in self.mappings.values() if key in v
-        ]
+        values = [v[key] for v in self.mappings.values() if key in v]
 
         if isinstance(values[0], MutableMapping):
-            return MergedMapping([
-                (k, v[key]) for k, v in self.mappings.items() if key in v
-            ])
+            return MergedMapping([(k, v[key]) for k, v in self.mappings.items() if key in v])
 
         if isinstance(values[0], MutableSequence):
             return sequences.MergedMutableSequence(values)
@@ -236,9 +228,7 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             # 2. The preferred scope IS the current one
             # 3. The key I want to write appears in this scope (which means
             # the preferred scope is lower priority than this)
-            if self.preferred_scope is None or \
-                    self.preferred_scope == scope or \
-                    key in item:
+            if self.preferred_scope is None or self.preferred_scope == scope or key in item:
                 return scope
         return None  # pragma: no cover
 
@@ -250,11 +240,9 @@ class MergedMapping(_MappingBase):  # pylint: disable=too-many-ancestors
     @preferred_scope.setter
     def preferred_scope(self, value):
         if value not in itertools.chain(self.mappings.keys(), [None]):
-            msg = '{0} is an invalid value for preferred scope. '
-            msg += 'Allowed values are {1}'
-            raise ValueError(
-                msg.format(str(value), str(self.mappings.keys()))
-            )
+            msg = "{0} is an invalid value for preferred scope. "
+            msg += "Allowed values are {1}"
+            raise ValueError(msg.format(str(value), str(self.mappings.keys())))
 
         self._preferred_scope = value
 
@@ -279,14 +267,12 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             scratch
     """
 
-    scratch_key = '_scratch_'
+    scratch_key = "_scratch_"
 
     def __init__(self, mappings, scratch_dict=None):
         super(OverridableMapping, self).__init__(mappings, maybe_empty=True)
         scratch_dict = {} if scratch_dict is None else scratch_dict
-        self.mappings = collections.OrderedDict(
-            [(self.scratch_key, scratch_dict)] + mappings
-        )
+        self.mappings = collections.OrderedDict([(self.scratch_key, scratch_dict)] + mappings)
 
     @staticmethod
     def _check_key_or_raise(key):
@@ -294,13 +280,13 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         # This limitation is currently due to how we override keys
         # (appending a ':' after the key)
         if not isinstance(key, six.string_types):
-            msg = 'unsupported key type [{0}]'.format(type(key))
+            msg = "unsupported key type [{0}]".format(type(key))
             raise TypeError(msg)
 
         # Ending a key with ':' is reserved to the implementation to
         # mark key that override everything in the hierarchy
-        if key.endswith(':'):
-            msg = ' a key cannot end with a \':\' character [{0}]'.format(key)
+        if key.endswith(":"):
+            msg = " a key cannot end with a ':' character [{0}]".format(key)
             raise ValueError(msg)
 
     def __getitem__(self, key):
@@ -311,10 +297,8 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         if isinstance(first_value, MutableMapping):
             # The first scope is not scratch
             if first_scope != self.scratch_key:
-                self.mappings[self.scratch_key][current_key.rstrip(':')] = {}
-                scratch_dict = self.mappings[self.scratch_key][
-                    current_key.rstrip(':')
-                ]
+                self.mappings[self.scratch_key][current_key.rstrip(":")] = {}
+                scratch_dict = self.mappings[self.scratch_key][current_key.rstrip(":")]
             else:
                 scratch_dict = first_value
                 values = values[1:]
@@ -333,7 +317,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         # Check that we don't have more than one key once we applied the
         # overriding rules
         scope2keys = [  # (scope, [list of matching keys])
-            (scope, [k for k in d if key == str(k).rstrip(':')])
+            (scope, [k for k in d if key == str(k).rstrip(":")])
             for (scope, d) in self.mappings.items()
         ]
         # TODO: check for len(keys) > 1 and raise if necessary
@@ -348,7 +332,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
             # was an overriding one
             current_key = keys[0]
             values.append((scope, self.mappings[scope][current_key]))
-            if current_key.endswith(':'):
+            if current_key.endswith(":"):
                 break
         # Mimic built-in if the key does not exist
         if not values:
@@ -361,7 +345,7 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         self._check_key_or_raise(key)
 
         # Compute the key and its corresponding override
-        key, override_key = key.rstrip(':'), key.rstrip(':') + ':'
+        key, override_key = key.rstrip(":"), key.rstrip(":") + ":"
         override_key_type = self._type_for_key_or_raise(override_key)
         current_type = override_key_type or self._type_for_key_or_raise(key)
 
@@ -373,12 +357,12 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         self.mappings[self.scratch_key][override_key] = value
 
     def __getattr__(self, item):
-        item = self.scratch_key if item == 'scratch' else item
+        item = self.scratch_key if item == "scratch" else item
         return super(OverridableMapping, self).__getattr__(item)
 
     def _get_merged_keys(self):
         keys = super(OverridableMapping, self)._get_merged_keys()
-        return [key for key in keys if not key.endswith(':')]
+        return [key for key in keys if not key.endswith(":")]
 
     def flattened(self, target=None):
         """Flattens the scopes up to target.
@@ -405,14 +389,12 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         # Check if the target is in the scope list
         if target not in self.mappings:
             msg = '"target" must be a valid scope [Accepted values: {0}]'
-            raise ValueError(msg.format(', '.join(
-                x for x in self.mappings if x != self.scratch_key
-            )))
+            raise ValueError(
+                msg.format(", ".join(x for x in self.mappings if x != self.scratch_key))
+            )
 
         # Copy the current object into a temporary one that will be modified
-        flattened = type(self)(
-            [(key, value) for key, value in copy.deepcopy(self.mappings).items()]
-        )
+        flattened = type(self)(list(copy.deepcopy(self.mappings).items()))
         scopes = list(flattened.mappings)
         for scope, next_scope in zip(scopes[:-1], scopes[1:]):
             # Break if the mapping is flattened onto target
@@ -442,8 +424,8 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
         """
         for key, value in current_map.items():
 
-            is_override = key.endswith(':')
-            normal_key, override_key = key.rstrip(':'), key.rstrip(':') + ':'
+            is_override = key.endswith(":")
+            normal_key, override_key = key.rstrip(":"), key.rstrip(":") + ":"
 
             # 1. If the key overrides what's below, report it as an override key
             # and pop the normal key if it was there
@@ -466,10 +448,13 @@ class OverridableMapping(_MappingBase):  # pylint: disable=too-many-ancestors
 
                 if isinstance(value, MutableMapping):
                     # Here we recurse on the two mappings
-                    flattened_map = OverridableMapping([
-                        ('first', current_map[normal_key]), ('second', next_map[key_type])
-                    ])
-                    flattened_map = flattened_map.flattened(target='second')
+                    flattened_map = OverridableMapping(
+                        [
+                            ("first", current_map[normal_key]),
+                            ("second", next_map[key_type]),
+                        ]
+                    )
+                    flattened_map = flattened_map.flattened(target="second")
                     flattened_map = dict(flattened_map.second.items())
                     next_map[key_type] = flattened_map
 

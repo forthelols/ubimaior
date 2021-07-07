@@ -288,7 +288,7 @@ class JsonFormatter(Dumper, Loader, PrettyPrinter):
 
 
 try:
-    import ruamel.yaml as yaml
+    import ruamel.yaml as yaml  # pylint: disable=consider-using-from-import
 
     @formatter("yaml", attribute="YAML")
     class YamlFormatter(Dumper, Loader, PrettyPrinter):
@@ -332,6 +332,7 @@ try:
             self._pprint_started = False
             #: Cache for the current attribute
             self._current_attribute = None
+            super(TomlFormatter, self).__init__()
 
         def load(self, stream):
             return toml.load(stream)

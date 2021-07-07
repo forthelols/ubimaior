@@ -324,7 +324,7 @@ try:
     class TomlFormatter(Dumper, Loader, PrettyPrinter):
         """Formatter for TOML"""
 
-        def __init__(self):
+        def __init__(self):  # pylint: disable=super-init-not-called
             #: Keeps track of which attributes need to
             #: be prepended to a given key = value pair
             self._token_stack = []
@@ -332,7 +332,6 @@ try:
             self._pprint_started = False
             #: Cache for the current attribute
             self._current_attribute = None
-            super(TomlFormatter, self).__init__()
 
         def load(self, stream):
             return toml.load(stream)

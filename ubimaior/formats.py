@@ -288,7 +288,7 @@ class JsonFormatter(Dumper, Loader, PrettyPrinter):
 
 
 try:
-    import ruamel.yaml as yaml
+    import ruamel.yaml as yaml  # pylint: disable=consider-using-from-import
 
     @formatter("yaml", attribute="YAML")
     class YamlFormatter(Dumper, Loader, PrettyPrinter):
@@ -324,7 +324,7 @@ try:
     class TomlFormatter(Dumper, Loader, PrettyPrinter):
         """Formatter for TOML"""
 
-        def __init__(self):
+        def __init__(self):  # pylint: disable=super-init-not-called
             #: Keeps track of which attributes need to
             #: be prepended to a given key = value pair
             self._token_stack = []

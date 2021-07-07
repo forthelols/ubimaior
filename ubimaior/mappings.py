@@ -13,7 +13,7 @@ try:
     from collections.abc import MutableMapping, MutableSequence  # novm
 except ImportError:
     import collections
-    from collections import MutableMapping, MutableSequence
+    from collections import MutableMapping, MutableSequence  # pylint: disable=deprecated-class
 
 
 def _is_tuple_str_mapping(obj):

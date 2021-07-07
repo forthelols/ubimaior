@@ -5,7 +5,7 @@ import itertools
 try:
     from collections.abc import Sequence, MutableSequence, Iterable  # novm
 except ImportError:
-    from collections import Sequence, MutableSequence, Iterable
+    from collections import Sequence, MutableSequence, Iterable  # pylint: disable=deprecated-class
 
 
 def _raise_if_not_slice_or_integer(item):

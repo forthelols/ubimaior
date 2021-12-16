@@ -23,7 +23,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
-jsonschema = "^3.2.0"
+jsonschema = "^4.0.0"
 click = "^8.0.3"
 "ruamel.yaml" = {version = "^0.16.12", optional = true}
 toml = {version = "^0.10.1", optional = true }

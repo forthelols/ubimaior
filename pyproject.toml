@@ -23,9 +23,9 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6.2"
-jsonschema = "^3.2.0"
-click = "^8.0.0"
-"ruamel.yaml" = {version = "^0.17.20", optional = true}
+jsonschema = "^4.0.0"
+click = "^8.0.3"
+"ruamel.yaml" = {version = "^0.17.19", optional = true}
 toml = {version = "^0.10.1", optional = true }
 
 [tool.poetry.extras]
@@ -37,8 +37,8 @@ pytest = "^6.2.0"
 pytest-cov = "^3.0.0"
 tox = "^3.20.1"
 pylint = "^2.7.0"
-flake8 = "^3.8.4"
-coverage = "^5.4"
+flake8 = "^4.0.1"
+coverage = "^6.2"
 vermin = "^1.1.0"
 black = "^21.12b0"
 mkdocs = "^1.1.2"

@@ -11,7 +11,7 @@ that mimics Python built-in objects.
 Many applications or libraries are customizable using configuration
 files, environment variables or command line arguments. In general
 a software can define different places, or _scopes_, where its configuration is 
-supposed to be stored or retrieved from. 
+stored or from where it is retrieved from. 
 
 Usually the semantics is such that configuration set in a higher
 scope overrides the one set in a lower scope. ``ubimaior``, instead,
@@ -55,9 +55,50 @@ config:
 ```
 i.e. a merge of the two files with a list / dictionary order that respects priority.
 
-## Setup configuration files for your project
+## Use `ubimaior` in your project
+
+Using `ubimaior` in a project is rather simple. The basic functionality
+is available through the `ubimaior.load` function.
+Let's go back to our previous example and assume we want to load the
+configuration split across the two `config.yaml` files in the "system" and "user" scope.
+A single call to `ubimaior.load` can do that:
+
+```python
+import ubimaior
+
+config = ubimaior.load(
+    config_name='config', config_format='yaml',
+    scopes=[('system', '/etc/app'), ('user', '~/.app')]
+)
+```
+The name of the config file is determined by the `config_name` and 
+the `config_format` arguments. The `scopes` argument instead defines 
+the configuration scopes as a `(name, path)` tuple.
+
+The `config` object is an instance of `ubimaior.mapping.OverridableMapping`
+and behaves effectively as a built-in dictionary:
+```python
+assert len(config) == 1
+assert len(config['config']['enable']) == 2
+```
+while the `config['config']['enable']` item is an instance of 
+`ubimaior.sequence.MergedSequence` and behaves like a tuple.
+For instance, we can add a new key:
+```python
+config['config']['data_dir'] = './data'
+```
 
 
+To serialize our changes back to disk we need to call:
+
+```python
+import ubimaior
+
+ubimaior.dump(
+    config.flattened(), config_name='config', config_format='yaml',
+    scopes=[('system', '/etc/app'), ('user', '~/.app')]
+)
+```
 
 ## Commands
 

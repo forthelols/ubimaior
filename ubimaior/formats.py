@@ -5,13 +5,7 @@ import abc
 import collections
 import json
 
-# The module enum does not exist for Python < 3.4,
-# so we are relying on an external substitute for Python 2.7
-try:
-    import enum
-except ImportError:  # pragma: no cover
-    import enum34 as enum  # pragma: no cover
-
+import enum
 import six
 
 import ubimaior
@@ -312,7 +306,6 @@ try:
 
             return line
 
-
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover
 
@@ -392,7 +385,6 @@ try:
                 key, self._current_attribute = self.current_key, None
                 line = "{0} = {1}".format(key, value)
             return line
-
 
 except ImportError:  # pragma: no cover
     pass  # pragma: no cover

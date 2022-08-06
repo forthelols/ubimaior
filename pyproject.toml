@@ -42,7 +42,6 @@ flake8 = "^4.0.1"
 coverage = "^6.2"
 vermin = "^1.1.0"
 black = "^21.12b0"
-mkdocs = "^1.1.2"
 
 [tool.poetry.scripts]
 ubimaior = "ubimaior.commands:main"

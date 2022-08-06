@@ -9,6 +9,10 @@ on:
   schedule:
     - cron: '16 22 * * 1'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_number }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze

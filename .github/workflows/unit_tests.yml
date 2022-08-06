@@ -9,7 +9,11 @@ on:
       - master
   schedule:
   - cron: "0 4 * * *"
-    
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_number }}
+  cancel-in-progress: true
+
 jobs:
   unit-tests:
     runs-on: ${{ matrix.os }}

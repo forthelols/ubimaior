@@ -8,7 +8,7 @@ import pytest
 
 @pytest.fixture()
 def sequence():
-    """An instance of a merged sequence """
+    """An instance of a merged sequence"""
     return ubimaior.MergedMutableSequence(
         [[1, 2, 3], ["a", "b", "c"], [False, True, None], [1, "a", False]]
     )

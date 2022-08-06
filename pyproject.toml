@@ -11,7 +11,6 @@ readme = "README.md"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Natural Language :: English",
     "Programming Language :: Python :: 2",
     "Programming Language :: Python :: 2.7",
@@ -19,6 +18,8 @@ classifiers = [
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
 ]
 
 [tool.poetry.dependencies]
@@ -47,7 +48,7 @@ mkdocs = "^1.1.2"
 ubimaior = "ubimaior.commands:main"
 
 [tool.pylint."MESSAGES CONTROL"]
-disable = "fixme,super-with-arguments,raise-missing-from"
+disable = "fixme,super-with-arguments,raise-missing-from,consider-using-f-string,unspecified-encoding"
 
 [tool.black]
 line-length = 100
